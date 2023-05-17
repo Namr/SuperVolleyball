@@ -1,0 +1,9 @@
+[submodule "deps/raylib"]
+	path = deps/raylib
+	url = git@github.com:raysan5/raylib.git
+[submodule "deps/datachannel-wasm"]
+	path = deps/datachannel-wasm
+	url = https://github.com/paullouisageneau/datachannel-wasm.git
+[submodule "deps/libdatachannel"]
+	path = deps/libdatachannel
+	url = git@github.com:paullouisageneau/libdatachannel.git
