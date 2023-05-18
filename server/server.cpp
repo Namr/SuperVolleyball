@@ -4,6 +4,9 @@
 #include <chrono>
 #include <thread>
 
+#include "core/inputs.hpp"
+#include "capnp/message.h"
+
 int main() {
   rtc::WebSocketServer::Configuration server_config;
   server_config.enableTls = false;
@@ -13,6 +16,7 @@ int main() {
   
   std::vector<std::shared_ptr<rtc::WebSocket>> client_connections;
   
+  kj::ArrayPtr<kj::byte> g = generateTestInput();
 
   ws_server.onClient([&](std::shared_ptr<rtc::WebSocket> ws) {
     std::cout << "New Websocket client" << std::endl;

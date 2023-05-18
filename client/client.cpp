@@ -2,8 +2,13 @@
 #include "rtc/rtc.hpp"
 #include <iostream>
 
+#include "core/inputs.hpp"
+
 int main() {
   rtc::WebSocket ws;
+
+  kj::ArrayPtr<kj::byte> g = generateTestInput();
+
   ws.onOpen([&]() {
     std::cout << "WebSocket open" << std::endl;
   });

@@ -7,3 +7,6 @@
 [submodule "deps/libdatachannel"]
 	path = deps/libdatachannel
 	url = git@github.com:paullouisageneau/libdatachannel.git
+[submodule "deps/capnproto"]
+	path = deps/capnproto
+	url = git@github.com:capnproto/capnproto.git
