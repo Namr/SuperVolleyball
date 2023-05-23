@@ -2,25 +2,23 @@
 #include "rtc/rtc.hpp"
 #include <iostream>
 
-#include "core/inputs.hpp"
+#include "client/input_reader.hpp"
 
 int main() {
   rtc::WebSocket ws;
 
-  kj::ArrayPtr<kj::byte> g = generateTestInput();
-
-  ws.onOpen([&]() {
-    std::cout << "WebSocket open" << std::endl;
-  });
+  ws.onOpen([&]() { std::cout << "WebSocket open" << std::endl; });
 
   ws.onError([](std::string error) {
     std::cout << "WebSocket error: " << error << std::endl;
   });
 
-  ws.onClosed([]() {
-    std::cout << "WebSocket closed" << std::endl;
+  ws.onClosed([]() { std::cout << "WebSocket closed" << std::endl; });
+
+  ws.onMessage([&](std::variant<rtc::binary, rtc::string> message) {
+      // TODO: do something
   });
-  
+
   ws.open("ws://127.0.0.1:8080");
 
   // Initialization
@@ -34,7 +32,10 @@ int main() {
   // Main game loop
   while (!WindowShouldClose()) // Detect window close button or ESC key
   {
-    // Update
+    // send inputs to server
+    kj::Array<capnp::word> to_send = svb_inputs::getCurrentInputState().serialize();
+    ws.send(reinterpret_cast<std::byte *>(to_send.begin()),
+                                to_send.size() * sizeof(capnp::word));
 
     // Draw
     BeginDrawing();
@@ -43,7 +44,7 @@ int main() {
 
     DrawText("Congrats! You created your first window!", 190, 200, 20,
              LIGHTGRAY);
-
+    
     EndDrawing();
   }
 
