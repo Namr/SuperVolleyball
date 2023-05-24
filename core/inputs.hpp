@@ -18,7 +18,7 @@ constexpr uint32_t TARGET_DOWN = 64;
 constexpr uint32_t TARGET_LEFT = 128;
 constexpr uint32_t TARGET_RIGHT = 256;
 
-class PlayerInputState : Serializable {
+class PlayerInputState : Serializable, Deserializable {
 public:
   PlayerInputState() = default;
   void addKey(uint32_t key);

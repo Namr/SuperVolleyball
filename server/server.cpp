@@ -25,7 +25,7 @@ int main() {
   server_config.bindAddress = "127.0.0.1";
   rtc::WebSocketServer ws_server(server_config);
 
-  std::vector<ClientSession> client_connections;
+  std::vector<std::shared_ptr<ClientSession>> client_connections;
   svb::World world;
 
   ws_server.onClient([&](std::shared_ptr<rtc::WebSocket> ws) {
@@ -37,6 +37,7 @@ int main() {
     world.players.push_back(p);
     session->socket = ws;
     session->player = p;
+    client_connections.push_back(session);
 
     ws->onOpen([]() {
       // note (amoussa): this should really be checked before we send anything
@@ -81,6 +82,13 @@ int main() {
     // and then immediatly releases it.
     for (std::shared_ptr<svb::Player> p : world.players) {
       p->tick();
+    }
+
+    // send world to clients
+    kj::Array<capnp::word> to_send = world.serialize();
+    for (std::shared_ptr<ClientSession> session : client_connections) {
+      session->socket->send(reinterpret_cast<std::byte *>(to_send.begin()),
+                           to_send.size() * sizeof(capnp::word));
     }
 
     // wait for next tick

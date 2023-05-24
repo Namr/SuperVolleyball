@@ -2,9 +2,13 @@
 #include "rtc/rtc.hpp"
 #include <iostream>
 
+#include "client/entity.hpp"
 #include "client/input_reader.hpp"
 
 int main() {
+
+  svb::EntityList world;
+
   rtc::WebSocket ws;
 
   ws.onOpen([&]() { std::cout << "WebSocket open" << std::endl; });
@@ -16,7 +20,18 @@ int main() {
   ws.onClosed([]() { std::cout << "WebSocket closed" << std::endl; });
 
   ws.onMessage([&](std::variant<rtc::binary, rtc::string> message) {
-      // TODO: read world state
+    if (std::holds_alternative<rtc::binary>(message)) {
+      // unpack the message
+      rtc::binary binary_message = std::get<rtc::binary>(message);
+      kj::ArrayPtr<capnp::word> message_data(
+          reinterpret_cast<capnp::word *>(binary_message.data()),
+          binary_message.size() * sizeof(std::byte));
+
+      world.deserialize(message_data);
+    } else {
+      std::cout << "The client got a string message, this is unexpected."
+                << std::endl;
+    }
   });
 
   ws.open("ws://127.0.0.1:8080");
@@ -27,26 +42,26 @@ int main() {
 
   InitWindow(screenWidth, screenHeight, "raylib [core] example - basic window");
 
-  SetTargetFPS(20); // Set our game to run at 60 frames-per-second
+  SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
   // Main game loop
   while (!WindowShouldClose()) // Detect window close button or ESC key
   {
     // send inputs to server
-    kj::Array<capnp::word> to_send = svb::input::getCurrentInputState().serialize();
+    kj::Array<capnp::word> to_send =
+        svb::input::getCurrentInputState().serialize();
     ws.send(reinterpret_cast<std::byte *>(to_send.begin()),
-                                to_send.size() * sizeof(capnp::word));
+            to_send.size() * sizeof(capnp::word));
 
     // Draw
     BeginDrawing();
 
     ClearBackground(RAYWHITE);
     
-    // TODO: render world
-    
-    DrawText("Congrats! You created your first window!", 190, 200, 20,
-             LIGHTGRAY);
-    
+    for (svb::Entity &e : world.entities) {
+      e.render();
+    }
+
     EndDrawing();
   }
 
