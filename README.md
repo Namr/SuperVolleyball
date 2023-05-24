@@ -4,7 +4,9 @@ An online multiplayer clone of the [best Mario Party minigame](https://www.mario
 
 ## Building
 
-This project uses WebAssembly to run the client in the browser, which is nice for the end user but makes building quite painful. Most annoying of all, you *must* clean (delete) your build directory if you want to switch from building the client to the server or vice versa.
+This project uses WebAssembly to run the client in the browser, which is nice for the end user but makes building quite painful. Once dependencies are installed, the `scripts` folder should make building less painful. They are the recommended way to build the project and are the source of truth for the build process.
+
+`clean.sh` removes the build dirs, `build_all.sh` builds the project assuming that everything has been cleaned. `rebuild.sh` builds the project assuming that `build_all.sh` was already run and has not be cleaned out. `run_single.sh` starts both the server and hosts the client via emscriptens `emrun` tool. `test.sh` and `quick_test.sh` build and run the project, with quick using rebuild instead of a clean build.
 
 ### Dependencies
 
@@ -15,30 +17,6 @@ We also need the following pre-compiled packages (listed as apt repositories but
 ```
 sudo apt-get install libglfw3-dev libxcursor-dev libxi libssl-dev
 ```
-
-
-### Building The Client
-
-Assuming emscripten is properly configured and sourced, you can run the below to build the client: 
-
-```
-cmake -B build -DCMAKE_TOOLCHAIN_FILE=$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DPLATFORM=Web
-cd build
-make
-```
-
-### Building The Server
-
-Run the following to build the server. Remember, you must clear away the client build artifacts for this to work properly.
-
-```
-cmake -B build
-cd build
-make
-```
-
-A script (`scripts/build_all.sh`) can be used to build both client and server. It also installs the server into the `bin` directory which allows you to run both after the builds have completed.
-
 
 ## Running Locally
 

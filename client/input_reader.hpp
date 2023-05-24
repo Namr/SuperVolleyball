@@ -1,5 +1,7 @@
 #include "core/inputs.hpp"
 
-namespace svb_inputs {
+namespace svb {
+namespace input {
   PlayerInputState getCurrentInputState();
-}
+} // namespace input
+} // namespace svb

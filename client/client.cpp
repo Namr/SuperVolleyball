@@ -16,7 +16,7 @@ int main() {
   ws.onClosed([]() { std::cout << "WebSocket closed" << std::endl; });
 
   ws.onMessage([&](std::variant<rtc::binary, rtc::string> message) {
-      // TODO: do something
+      // TODO: read world state
   });
 
   ws.open("ws://127.0.0.1:8080");
@@ -33,7 +33,7 @@ int main() {
   while (!WindowShouldClose()) // Detect window close button or ESC key
   {
     // send inputs to server
-    kj::Array<capnp::word> to_send = svb_inputs::getCurrentInputState().serialize();
+    kj::Array<capnp::word> to_send = svb::input::getCurrentInputState().serialize();
     ws.send(reinterpret_cast<std::byte *>(to_send.begin()),
                                 to_send.size() * sizeof(capnp::word));
 
@@ -41,7 +41,9 @@ int main() {
     BeginDrawing();
 
     ClearBackground(RAYWHITE);
-
+    
+    // TODO: render world
+    
     DrawText("Congrats! You created your first window!", 190, 200, 20,
              LIGHTGRAY);
     

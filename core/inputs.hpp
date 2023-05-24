@@ -5,7 +5,8 @@
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 
-namespace svb_inputs {
+namespace svb {
+namespace input {
 
 constexpr uint32_t PLAYER_UP = 1;
 constexpr uint32_t PLAYER_DOWN = 2;
@@ -31,4 +32,5 @@ private:
   uint32_t state_ = 0;
 };
 
-};
+} // namespace input
+} // namespace svb

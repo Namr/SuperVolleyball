@@ -1,7 +1,8 @@
 #include "core/proto/input.capnp.h"
 #include "inputs.hpp"
 
-namespace svb_inputs {
+namespace svb {
+namespace input {
 
 void PlayerInputState::addKey(uint32_t key) { state_ = state_ | key; }
 
@@ -27,4 +28,5 @@ void PlayerInputState::deserialize(const kj::ArrayPtr<capnp::word> &raw_data) {
   state_ = input.getState();
 }
 
-}; // namespace svb_inputs
+} // namespace input
+} // namespace svb
