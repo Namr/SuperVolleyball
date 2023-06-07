@@ -37,16 +37,20 @@ int main() {
   ws.open("ws://127.0.0.1:8080");
 
   // Initialization
-  const int screenWidth = 800;
-  const int screenHeight = 450;
+  const int canvas_width = 1024;
+  const int canvas_height = 576;
 
-  InitWindow(screenWidth, screenHeight, "raylib [core] example - basic window");
+  InitWindow(canvas_width, canvas_height, "Super Volleyball");
 
-  SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+  SetTargetFPS(60);
+
+  std::chrono::duration<double> delta_time(0.0);
+  auto start = std::chrono::system_clock::now();
 
   // Main game loop
-  while (!WindowShouldClose()) // Detect window close button or ESC key
-  {
+  while (!WindowShouldClose()) {
+    delta_time = std::chrono::system_clock::now() - start;
+    start = std::chrono::system_clock::now();
     // send inputs to server
     kj::Array<capnp::word> to_send =
         svb::input::getCurrentInputState().serialize();
@@ -57,14 +61,15 @@ int main() {
     BeginDrawing();
 
     ClearBackground(RAYWHITE);
-    
+
     for (svb::Entity &e : world.entities) {
       e.render();
+      e.tick(delta_time.count());
     }
 
     EndDrawing();
   }
 
-  CloseWindow(); // Close window and OpenGL context
+  CloseWindow();
   return 0;
 }

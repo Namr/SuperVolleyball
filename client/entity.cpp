@@ -4,9 +4,11 @@
 
 namespace svb {
 
-void Entity::render() const { DrawCircle(position.x(), position.y(), radius, RED); }
+void Entity::render() const {
+  DrawCircle(position.x(), position.y(), radius, RED);
+}
 
-void Entity::tick() { position += velocity; }
+void Entity::tick(float delta_time) { position += velocity * delta_time; }
 
 void EntityList::deserialize(const kj::ArrayPtr<capnp::word> &raw_data) {
   entities.clear();

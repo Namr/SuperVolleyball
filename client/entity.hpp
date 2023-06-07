@@ -9,7 +9,7 @@ class Entity {
 public:
   Entity() = default;
   void render() const;
-  void tick();
+  void tick(float delta_time);
 
   Vector2f position;
   Vector2f velocity;
