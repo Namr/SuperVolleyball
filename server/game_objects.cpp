@@ -4,38 +4,35 @@
 
 namespace svb {
 
-constexpr int court_center_x = 512;
-constexpr int court_center_y = 288;
-constexpr int court_width = 624;
-constexpr int court_height = 376;
-
-Player::Player() : position_(0.0, 0.0), velocity_(0.0, 0.0), radius_(35.0) {}
+Player::Player() : position_(0.0, 0.0), velocity_(0.0, 0.0), radius_(player_base_radius) {}
 
 Player::Player(int game_position)
-    : position_(0.0, 0.0), velocity_(0.0, 0.0), radius_(35.0) {
+    : position_(0.0, 0.0), velocity_(0.0, 0.0), radius_(player_base_radius) {
 
   switch (game_position) {
   case 0:
-    position_ = Vector2f(court_center_x - (court_width / 2),
-                         court_center_y - (court_height / 2));
+    position_ =
+        Vector2f(court_center_x - court_width, court_center_y - court_height);
     break;
   case 1:
-    position_ = Vector2f(court_center_x - (court_width / 2),
-                         court_center_y + (court_height / 2));
+    position_ =
+        Vector2f(court_center_x - court_width, court_center_y + court_height);
     break;
   case 2:
-    position_ = Vector2f(court_center_x + (court_width / 2),
-                         court_center_y - (court_height / 2));
+    position_ =
+        Vector2f(court_center_x + court_width, court_center_y - court_height);
     break;
   case 3:
-    position_ = Vector2f(court_center_x + (court_width / 2),
-                         court_center_y + (court_height / 2));
+    position_ =
+        Vector2f(court_center_x + court_width, court_center_y + court_height);
     break;
   default:
     std::cout << "ERROR: invalid game position given, this should never happen"
               << std::endl;
     break;
   }
+
+  role_ = game_position;
 }
 
 void Player::update(input::PlayerInputState input) {
@@ -57,7 +54,7 @@ void Player::update(input::PlayerInputState input) {
   // normalize
   if (velocity_.normSquared() != 0.0) {
     velocity_ = velocity_ / velocity_.norm();
-    velocity_ *= PLAYER_SPEED;
+    velocity_ *= player_speed;
   }
 
   // TODO: implement targeting
@@ -77,8 +74,31 @@ void Player::update(input::PlayerInputState input) {
 void Player::tick(float delta_time) {
   lock_.lock();
   position_ += velocity_ * delta_time;
-  // std::cout << "x: " << position_.x() << " | y: " << position_.y() <<
-  // std::endl;
+  
+  // enforce court bounds
+  if (position_.y() > court_center_y + court_height) {
+    position_.y() = court_center_y + court_height;
+  }
+  if (position_.y() < court_center_y - court_height) {
+    position_.y() = court_center_y - court_height;
+  }
+
+  if (role_ <= 1) {
+    if (position_.x() > court_center_x) {
+      position_.x() = court_center_x;
+    }
+    if (position_.x() < court_center_x - court_width) {
+      position_.x() = court_center_x - court_width;
+    }
+  } else {
+    if (position_.x() < court_center_x) {
+      position_.x() = court_center_x;
+    }
+    if (position_.x() > court_center_x + court_width) {
+      position_.x() = court_center_x + court_width;
+    }
+  }
+
   lock_.unlock();
 }
 

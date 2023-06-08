@@ -37,9 +37,12 @@ int main() {
   ws.open("ws://127.0.0.1:8080");
 
   // Initialization
-  const int canvas_width = 1024;
-  const int canvas_height = 576;
-
+  constexpr int canvas_width = 1024;
+  constexpr int canvas_height = 576;
+  // TODO: unify with values in server/game_objects.hpp
+  constexpr int court_offset_x = 100;
+  constexpr int court_offset_y = 50;
+  constexpr int court_line_width = 10;
   InitWindow(canvas_width, canvas_height, "Super Volleyball");
 
   SetTargetFPS(60);
@@ -61,6 +64,19 @@ int main() {
     BeginDrawing();
 
     ClearBackground(RAYWHITE);
+
+    // court bounds
+    DrawRectangle(court_offset_x, court_offset_y, court_line_width,
+                  canvas_height - (court_offset_y * 2), BLACK);
+    DrawRectangle(
+        canvas_width - court_offset_x, court_offset_y, court_line_width,
+        canvas_height - (court_offset_y * 2) + court_line_width, BLACK);
+    DrawRectangle(canvas_width / 2, court_offset_y, court_line_width,
+                  canvas_height - (court_offset_y * 2), BLACK);
+    DrawRectangle(court_offset_x, court_offset_y,
+                  canvas_width - (court_offset_x * 2), court_line_width, BLACK);
+    DrawRectangle(court_offset_x, canvas_height - court_offset_y,
+                  canvas_width - (court_offset_x * 2), court_line_width, BLACK);
 
     for (svb::Entity &e : world.entities) {
       e.render();
