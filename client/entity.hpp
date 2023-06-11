@@ -14,6 +14,7 @@ public:
   Vector2f position;
   Vector2f velocity;
   float radius;
+  int8_t color;
 };
 
 class EntityList : Deserializable {

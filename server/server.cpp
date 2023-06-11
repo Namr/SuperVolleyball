@@ -26,8 +26,7 @@ int main() {
   rtc::WebSocketServer ws_server(server_config);
 
   int num_connected = 0;
-  std::array<std::optional<std::shared_ptr<ClientSession>>, svb::max_players>
-      client_connections;
+  std::array<std::optional<std::shared_ptr<ClientSession>>, svb::max_players> client_connections;
   svb::World world;
 
   ws_server.onClient([&](std::shared_ptr<rtc::WebSocket> ws) {
@@ -115,13 +114,24 @@ int main() {
     auto target_next_tick_time = start + time_per_tick;
 
     // game logic
-    // note (amoussa): the intention here is that this loop copies the
-    // shared_ptr for only as long as it is running (to ensure it is not freed)
-    // and then releases it at the end of the loop.
-    for (std::optional<std::shared_ptr<svb::Player>> p : world.players) {
-      if (p) {
-        p.value()->tick(delta_time.count());
+    // TODO: instead of just pausing ticks, not having enough players should
+    // display some sort of waiting message for the client
+    if (num_connected == svb::max_players) {
+      // note (amoussa): the intention here is that this loop copies the
+      // shared_ptr for only as long as it is running (to ensure it is not
+      // freed) and then releases it at the end of the loop.
+      for (std::optional<std::shared_ptr<svb::Player>> p : world.players) {
+        if (p) {
+          // collision checking
+          if ((p.value()->getPosition() - world.ball.getPosition()).norm() <
+              p.value()->getRadius() + world.ball.getRadius()) {
+            p.value()->onBallCollision(world.ball);
+          }
+
+          p.value()->tick(delta_time.count());
+        }
       }
+      world.ball.tick(delta_time.count());
     }
 
     // send world to clients

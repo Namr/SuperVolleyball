@@ -9,6 +9,7 @@ struct Entity {
   position @0 :Vector2f;
   velocity @1 :Vector2f;
   radius @2 :Float32;
+  color @3: Int8;
 }
 
 struct EntityList {

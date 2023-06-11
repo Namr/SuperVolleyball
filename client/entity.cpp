@@ -5,7 +5,21 @@
 namespace svb {
 
 void Entity::render() const {
-  DrawCircle(position.x(), position.y(), radius, RED);
+  Color c;
+
+  switch (color) {
+  default:
+  case 0:
+    c = RED;
+    break;
+  case 1:
+    c = GREEN;
+    break;
+  case 2:
+    c = BLUE;
+    break;
+  }
+  DrawCircle(position.x(), position.y(), radius, c);
 }
 
 void Entity::tick(float delta_time) { position += velocity * delta_time; }
@@ -24,6 +38,7 @@ void EntityList::deserialize(const kj::ArrayPtr<capnp::word> &raw_data) {
     to_add.velocity.x() = e.getVelocity().getX();
     to_add.velocity.y() = e.getVelocity().getY();
     to_add.radius = e.getRadius();
+    to_add.color = e.getColor();
     entities.push_back(to_add);
   }
 }

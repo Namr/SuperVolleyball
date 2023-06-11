@@ -1,28 +1,42 @@
 #pragma once
+#include "core/court_definition.hpp"
 #include "core/inputs.hpp"
 #include "core/serialization.hpp"
 #include "core/vectors.hpp"
 
+#include <array>
 #include <memory>
 #include <mutex>
-#include <array>
 #include <optional>
+#include <random>
 
 namespace svb {
 
-constexpr float player_speed = 300.0;
-constexpr float player_base_radius = 24.0;
-constexpr int max_players = 4;
+class Ball {
+public:
+  Ball();
+  void tick(float delta_time);
+  void chooseTarget();
 
-constexpr int canvas_width = 1024;
-constexpr int canvas_height = 576;
-constexpr int court_center_x = 512;
-constexpr int court_center_y = 288;
-constexpr int court_padding_x = 100;
-constexpr int court_padding_y = 50;
+  inline const Vector2f &getPosition() const { return position_; };
+  inline const Vector2f &getTargetPosition() const { return target_; };
+  inline const Vector2f &getVelocity() const { return velocity_; };
+  inline const float getRadius() const { return radius_; };
+  inline const int8_t getSide() const { return side_; };
 
-constexpr int court_width = (canvas_width - (court_padding_x * 2))/ 2;
-constexpr int court_height = (canvas_height - (court_padding_y * 2)) / 2;
+private:
+  Vector2f position_;
+  Vector2f velocity_;
+  Vector2f target_;
+  int8_t side_;
+  float radius_;
+  std::mutex lock_;
+
+  std::default_random_engine generator_;
+  std::uniform_real_distribution<float> target_x_distribution_1_;
+  std::uniform_real_distribution<float> target_x_distribution_2_;
+  std::uniform_real_distribution<float> target_y_distribution_;
+};
 
 class Player {
 public:
@@ -30,6 +44,7 @@ public:
   Player(int role);
   void update(input::PlayerInputState input);
   void tick(float delta_time);
+  void onBallCollision(Ball &b);
 
   inline const Vector2f &getPosition() const { return position_; };
   inline const Vector2f &getVelocity() const { return velocity_; };
@@ -40,6 +55,7 @@ private:
   Vector2f velocity_;
   float radius_;
   int role_;
+  bool hitting_;
   std::mutex lock_;
 };
 
@@ -49,6 +65,7 @@ public:
   kj::Array<capnp::word> serialize();
 
   std::array<std::optional<std::shared_ptr<Player>>, max_players> players;
+  Ball ball;
 };
 
 } // namespace svb

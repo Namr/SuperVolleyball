@@ -20,7 +20,7 @@ public:
     return *this;
   }
 
-  inline Vector2f operator+(const Vector2f &other) {
+  inline Vector2f operator+(const Vector2f &other) const {
     Vector2f sum = *this; // should produce a copy
     sum += other;
     return sum;
@@ -32,7 +32,7 @@ public:
     return *this;
   }
 
-  inline Vector2f operator-(const Vector2f &other) {
+  inline Vector2f operator-(const Vector2f &other) const {
     Vector2f sum = *this; // should produce a copy
     sum -= other;
     return sum;
@@ -44,7 +44,7 @@ public:
     return *this;
   }
 
-  inline Vector2f operator/(const float other) {
+  inline Vector2f operator/(const float other) const {
     Vector2f total = *this; // should produce a copy
     total /= other;
     return total;
@@ -56,7 +56,7 @@ public:
     return *this;
   }
 
-  inline Vector2f operator*(const float other) {
+  inline Vector2f operator*(const float other) const {
     Vector2f total = *this; // should produce a copy
     total *= other;
     return total;
