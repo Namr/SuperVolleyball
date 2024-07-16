@@ -1,0 +1,9 @@
+[submodule "GameNetworkingSockets"]
+	path = deps/GameNetworkingSockets
+	url = git@github.com:ValveSoftware/GameNetworkingSockets.git
+[submodule "deps/cereal"]
+	path = deps/cereal
+	url = git@github.com:USCiLab/cereal.git
+[submodule "deps/raylib"]
+	path = deps/raylib
+	url = git@github.com:raysan5/raylib.git
