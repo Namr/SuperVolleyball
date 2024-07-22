@@ -69,6 +69,11 @@ public:
       if (msg.current_room != static_cast<uint16_t>(-1)) {
         current_room_ = msg.current_room;
       }
+
+      if (!msg.rooms.empty()) {
+        rooms_ = std::move(msg.rooms);
+      }
+
       incoming_msg->Release();
     }
   }
@@ -76,6 +81,25 @@ public:
   void runCallbacks() {
     current_callback_instance_ = this;
     network_interface_->RunCallbacks();
+  }
+
+  void updateRoomList() {
+    ClientNetworkMessage msg;
+    msg.room_request.command = RR_LIST_ROOMS;
+    sendRequest(msg);
+  }
+
+  void joinRoom(uint16_t desired_room) {
+    ClientNetworkMessage msg;
+    msg.room_request.command = RR_JOIN_ROOM;
+    msg.room_request.desired_room = desired_room;
+    sendRequest(msg);
+  }
+
+  void makeRoom() {
+    ClientNetworkMessage msg;
+    msg.room_request.command = RR_MAKE_ROOM;
+    sendRequest(msg);
   }
 
   void sendRequest(ClientNetworkMessage &msg) {
@@ -92,6 +116,7 @@ public:
   }
 
   uint16_t current_room_ = -1;
+  std::vector<uint16_t> rooms_;
 
 private:
   // singleton-ish structure here s.t we can use C API to call callbacks
@@ -122,27 +147,65 @@ private:
 
 Client *Client::current_callback_instance_ = nullptr;
 
+void DrawTextCentered(const std::string &text, int x, int y, int font_size,
+                      Color color) {
+  int width = MeasureText(text.c_str(), font_size) / 2;
+  DrawText(text.c_str(), x - width, y, font_size, color);
+}
+
 int main() {
   Client client;
   client.start();
   InitWindow(800, 450, "SuperVolleyball");
 
+  client.updateRoomList();
+
+  size_t selected_room = 0;
   while (!WindowShouldClose()) {
     BeginDrawing();
     client.runCallbacks();
     client.processIncomingMessages();
-    ClearBackground(RAYWHITE);
+    ClearBackground(BLACK);
+    // handle joining rooms
     if (client.current_room_ == static_cast<uint16_t>(-1)) {
-      DrawText("press spacebar to make a room", 190, 200, 20, LIGHTGRAY);
-      if (IsKeyReleased(KEY_SPACE)) {
-        ClientNetworkMessage request;
-        request.room_request.command = RR_MAKE_ROOM;
-        client.sendRequest(request);
+      DrawTextCentered("Welcome to SuperVolleyball!", 400, 0, 20, RAYWHITE);
+      DrawTextCentered(
+          "Press R to refresh room list or press C to make a new room", 400, 20,
+          20, RAYWHITE);
+      DrawTextCentered("Rooms:", 400, 40, 20, RAYWHITE);
+
+      int line_start = 60;
+      for (int i = 0; i < client.rooms_.size(); i++) {
+        if (i == selected_room) {
+          std::string text = "< " + std::to_string(client.rooms_[i]) + " >";
+          DrawText(text.c_str(), 400, line_start, 20, RAYWHITE);
+        } else {
+          DrawText(std::to_string(client.rooms_[i]).c_str(), 400, line_start,
+                   20, RAYWHITE);
+        }
+        line_start += 20;
       }
+
+      if (IsKeyReleased(KEY_C)) {
+        client.makeRoom();
+      } else if (IsKeyReleased(KEY_R)) {
+        client.updateRoomList();
+      } else if (IsKeyReleased(KEY_ENTER)) {
+        client.joinRoom(client.rooms_[selected_room]);
+      } else if (IsKeyReleased(KEY_DOWN)) {
+        selected_room++;
+      } else if (IsKeyReleased(KEY_UP)) {
+        selected_room--;
+      }
+
+      selected_room = std::clamp(selected_room, 0UL, client.rooms_.size() - 1);
     } else {
+      // wait for match to start
       std::string str =
           "you are in room: " + std::to_string(client.current_room_);
-      DrawText(str.c_str(), 190, 200, 20, LIGHTGRAY);
+      DrawTextCentered(str.c_str(), 400, 200, 20, LIGHTGRAY);
+
+      // actually play the match
     }
 
     EndDrawing();

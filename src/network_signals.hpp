@@ -45,7 +45,7 @@ struct ClientNetworkMessage {
 };
 
 struct ServerNetworkMessage {
-  std::vector<uint64_t> rooms;
+  std::vector<uint16_t> rooms;
   uint16_t current_room = -1;
   uint16_t num_players = 0;
   GameState game_state;
