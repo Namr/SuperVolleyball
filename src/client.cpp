@@ -4,6 +4,8 @@
 #include <steam/steamnetworkingsockets.h>
 #include <string>
 
+#include "network_signals.hpp"
+
 class Client {
 public:
   Client() = default;
@@ -54,9 +56,19 @@ public:
                   << std::endl;
       }
 
-      std::string msg;
-      msg.assign((const char *)incoming_msg->m_pData, incoming_msg->m_cbSize);
-      std::cout << msg << std::endl;
+      // deserialize the server request
+      ServerNetworkMessage msg;
+      {
+        std::stringstream ss(std::ios::binary | std::ios_base::app |
+                             std::ios_base::in | std::ios_base::out);
+        ss.write((char const *)incoming_msg->m_pData, incoming_msg->m_cbSize);
+        cereal::BinaryInputArchive dearchive(ss);
+        dearchive(msg);
+      }
+
+      if (msg.current_room != static_cast<uint16_t>(-1)) {
+        current_room_ = msg.current_room;
+      }
       incoming_msg->Release();
     }
   }
@@ -66,11 +78,20 @@ public:
     network_interface_->RunCallbacks();
   }
 
-  void sendString(const std::string &msg) {
+  void sendRequest(ClientNetworkMessage &msg) {
+    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
+                                       std::ios_base::in | std::ios_base::out);
+    {
+      cereal::BinaryOutputArchive archive(response_stream);
+      archive(msg);
+    }
+    std::string tmp_str = response_stream.str();
     network_interface_->SendMessageToConnection(
-        connection_, msg.c_str(), (uint32)msg.length(),
+        connection_, tmp_str.c_str(), tmp_str.size(),
         k_nSteamNetworkingSend_Reliable, nullptr);
   }
+
+  uint16_t current_room_ = -1;
 
 private:
   // singleton-ish structure here s.t we can use C API to call callbacks
@@ -111,13 +132,19 @@ int main() {
     client.runCallbacks();
     client.processIncomingMessages();
     ClearBackground(RAYWHITE);
-    DrawText("there should be a game here.... eventually", 190, 200, 20,
-             LIGHTGRAY);
-
-    if (IsKeyReleased(KEY_SPACE)) {
-      std::cout << "trying to do this" << std::endl;
-      client.sendString("ping");
+    if (client.current_room_ == static_cast<uint16_t>(-1)) {
+      DrawText("press spacebar to make a room", 190, 200, 20, LIGHTGRAY);
+      if (IsKeyReleased(KEY_SPACE)) {
+        ClientNetworkMessage request;
+        request.room_request.command = RR_MAKE_ROOM;
+        client.sendRequest(request);
+      }
+    } else {
+      std::string str =
+          "you are in room: " + std::to_string(client.current_room_);
+      DrawText(str.c_str(), 190, 200, 20, LIGHTGRAY);
     }
+
     EndDrawing();
   }
 
