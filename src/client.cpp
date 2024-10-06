@@ -66,12 +66,16 @@ public:
         dearchive(msg);
       }
 
-      if (msg.current_room != static_cast<uint16_t>(-1)) {
-        current_room_ = msg.current_room;
+      if (msg.room_state.current_room != -1) {
+        current_room_ = msg.room_state.current_room;
       }
 
-      if (!msg.rooms.empty()) {
-        rooms_ = std::move(msg.rooms);
+      if (msg.room_state.num_connected != -1) {
+        num_players_ = msg.room_state.num_connected;
+      }
+
+      if (!msg.available_rooms.empty()) {
+        rooms_ = std::move(msg.available_rooms);
       }
 
       incoming_msg->Release();
@@ -116,7 +120,8 @@ public:
   }
 
   uint16_t current_room_ = -1;
-  std::vector<uint16_t> rooms_;
+  uint16_t num_players_ = -1;
+  std::vector<int> rooms_;
 
 private:
   // singleton-ish structure here s.t we can use C API to call callbacks
@@ -201,9 +206,12 @@ int main() {
       selected_room = std::clamp(selected_room, 0UL, client.rooms_.size() - 1);
     } else {
       // wait for match to start
-      std::string str =
+      std::string room_id =
           "you are in room: " + std::to_string(client.current_room_);
-      DrawTextCentered(str.c_str(), 400, 200, 20, LIGHTGRAY);
+      std::string room_members =
+          "there are " + std::to_string(client.num_players_) + " players here";
+      DrawTextCentered(room_id.c_str(), 400, 100, 20, LIGHTGRAY);
+      DrawTextCentered(room_members.c_str(), 400, 120, 20, LIGHTGRAY);
 
       // actually play the match
     }

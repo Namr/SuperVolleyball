@@ -1,5 +1,6 @@
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingsockets.h>
 #include <string>
@@ -10,10 +11,13 @@
 #include "network_signals.hpp"
 
 constexpr uint16_t PORT = 25565;
+constexpr size_t MAX_ROOMS = 16;
+constexpr size_t PLAYERS_PER_ROOM = 2;
 
 struct Room {
+  RoomState room_state;
   GameState game_state;
-  std::vector<uint16_t> players;
+  std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
 };
 
 class Server {
@@ -21,6 +25,11 @@ public:
   Server() = default;
 
   void start() {
+    // init rooms
+    for (int i = 0; i < MAX_ROOMS; i++) {
+      rooms_[i].room_state.current_room = i;
+    }
+
     // init connection lib
     SteamDatagramErrMsg error_msg;
     if (!GameNetworkingSockets_Init(nullptr, error_msg)) {
@@ -113,34 +122,29 @@ private:
           cereal::BinaryInputArchive dearchive(ss);
           dearchive(msg);
         }
-        ServerNetworkMessage response; // allocate our response
 
         // if not in room, respond to room requests
-        if (connected_clients_[incoming_msg->m_conn] == nullptr) {
-          switch (msg.room_request.command) {
-          case RR_LIST_ROOMS:
-            for (auto it : rooms_) {
-              response.rooms.push_back(it.first);
+        if (connected_clients_[incoming_msg->m_conn] == -1) {
+          ServerNetworkMessage response;
+          if (msg.room_request.command == RR_LIST_ROOMS) {
+            for (int i = 0; i < MAX_ROOMS; i++) {
+              if (rooms_[i].room_state.num_connected > 0) {
+                response.available_rooms.push_back(i);
+              }
             }
             sendRequest(response, incoming_msg->m_conn);
-            break;
-          case RR_JOIN_ROOM:
-            if (joinRoom(incoming_msg->m_conn, msg.room_request.desired_room)) {
-              response.current_room = msg.room_request.desired_room;
-            } else {
-              // TODO: throw error
+          } else if (msg.room_request.command == RR_JOIN_ROOM) {
+            if (!joinRoom(incoming_msg->m_conn,
+                          msg.room_request.desired_room)) {
+              // send error
+              std::cout << "error joining a room\n";
             }
-            sendRequest(response, incoming_msg->m_conn);
-            break;
-          case RR_MAKE_ROOM:
-            response.current_room = makeRoom();
-            if (!joinRoom(incoming_msg->m_conn, response.current_room)) {
-              // TODO throw error
+          } else if (msg.room_request.command == RR_MAKE_ROOM) {
+            int room_id = makeRoom(incoming_msg->m_conn);
+            if (room_id == -1) {
+              // send error
+              std::cout << "error making a room\n";
             }
-            sendRequest(response, incoming_msg->m_conn);
-            break;
-          default:
-            break;
           }
         } else {
           // is the room in a waiting mode?
@@ -186,14 +190,18 @@ private:
     }
 
     // store the connection somewhere we can use it
-    connected_clients_.emplace(info->m_hConn, nullptr);
+    connected_clients_.emplace(info->m_hConn, -1);
     std::cout << "we got a new connection!" << std::endl;
   }
 
   void onClientDisconnection(SteamNetConnectionStatusChangedCallback_t *info) {
     // only deal with it if they were previously connected
     if (info->m_eOldState == k_ESteamNetworkingConnectionState_Connected) {
+
       // delete connection from storage
+      if (connected_clients_[info->m_hConn] != -1) {
+        leaveRoom(info->m_hConn, connected_clients_[info->m_hConn]);
+      }
       connected_clients_.erase(info->m_hConn);
 
       // close out connection
@@ -215,37 +223,68 @@ private:
         k_nSteamNetworkingSend_Reliable, nullptr);
   }
 
-  bool joinRoom(uint16_t player, uint16_t room) {
-    if (rooms_.find(room) == rooms_.end()) {
+  bool joinRoom(HSteamNetConnection player, int room_id) {
+    Room &room = rooms_[room_id];
+    if (room.room_state.num_connected >= PLAYERS_PER_ROOM) {
       return false;
     }
-    connected_clients_[player] = rooms_[room];
-    rooms_[room]->players.push_back(player);
+
+    room.room_state.num_connected++;
+    connected_clients_[player] = room_id;
+    // emplace player into the first empty slot
+    for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+      if (!room.players[i].has_value()) {
+        room.players[i] = player;
+        break;
+      }
+    }
+    propogateRoomState(room_id);
     return true;
   }
 
-  uint16_t makeRoom() {
-    rooms_[next_room_id_] = std::make_shared<Room>();
-    return next_room_id_++;
+  int makeRoom(HSteamNetConnection player) {
+    // find first empty room slot and join it
+    for (int i = 0; i < MAX_ROOMS; i++) {
+      if (rooms_[i].room_state.num_connected == 0 &&
+          joinRoom(player, i) == true) {
+        propogateRoomState(i);
+        return i;
+      }
+    }
+    return -1;
   }
 
-  bool leaveRoom(uint16_t player, uint16_t room) {
-    if (rooms_.find(room) == rooms_.end()) {
-      return false;
+  bool leaveRoom(HSteamNetConnection player, int room_id) {
+    Room &room = rooms_[room_id];
+    for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+      if (room.players[i] == player) {
+        room.players[i] = std::nullopt;
+        connected_clients_[player] = -1;
+        room.room_state.num_connected--;
+        propogateRoomState(room_id);
+        return true;
+      }
     }
-    rooms_[room]->players.erase(std::find(rooms_[room]->players.begin(),
-                                          rooms_[room]->players.end(), player));
-    connected_clients_[player] = nullptr;
-    return true;
+
+    return false;
+  }
+
+  void propogateRoomState(int room_id) {
+    ServerNetworkMessage msg;
+    msg.room_state = rooms_[room_id].room_state;
+
+    for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+      if (rooms_[room_id].players[i]) {
+        sendRequest(msg, rooms_[room_id].players[i].value());
+      }
+    }
   }
 
   ISteamNetworkingSockets *network_interface_ = nullptr;
   HSteamListenSocket socket_;
   HSteamNetPollGroup poll_group_;
-  std::unordered_map<HSteamNetConnection, std::shared_ptr<Room>>
-      connected_clients_;
-  std::unordered_map<uint16_t, std::shared_ptr<Room>> rooms_;
-  uint16_t next_room_id_ = 0;
+  std::unordered_map<HSteamNetConnection, int> connected_clients_;
+  std::array<Room, MAX_ROOMS> rooms_;
   bool should_quit_ = false;
 };
 Server *Server::current_callback_instance_ = nullptr;

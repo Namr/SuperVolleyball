@@ -11,9 +11,8 @@
 #define RR_MAKE_ROOM 3
 
 struct RoomRequest {
-  uint16_t command = RR_NO_REQUEST;
-  uint16_t desired_room = -1;
-
+  uint64_t command = RR_NO_REQUEST;
+  int desired_room = -1;
 
   template<class Archive>
   void serialize(Archive & archive) {
@@ -44,15 +43,30 @@ struct ClientNetworkMessage {
   }
 };
 
+#define RS_WAITING  0
+#define RS_READY  1
+#define RS_PLAYING  2
+
+struct RoomState {
+  uint16_t state = RS_WAITING;
+  int current_room = -1;
+  int num_connected = 0;
+
+
+  template<class Archive>
+  void serialize(Archive & archive) {
+    archive(state, current_room, num_connected);
+  }
+};
+
 struct ServerNetworkMessage {
-  std::vector<uint16_t> rooms;
-  uint16_t current_room = -1;
-  uint16_t num_players = 0;
+  std::vector<int> available_rooms;
+  RoomState room_state;
   GameState game_state;
 
 
   template<class Archive>
   void serialize(Archive & archive) {
-    archive(rooms, current_room, num_players, game_state);
+    archive(available_rooms, room_state, game_state);
   }
 };
