@@ -18,6 +18,15 @@ struct Room {
   RoomState room_state;
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
+
+  std::optional<size_t> playerIndexOfConnection(HSteamNetConnection conn) {
+    for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+      if (this->players[i] == conn) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  }
 };
 
 class Server {
@@ -147,7 +156,23 @@ private:
             }
           }
         } else {
-          // is the room in a waiting mode?
+          int room_id = connected_clients_[incoming_msg->m_conn];
+          Room &room = rooms_[room_id];
+          std::optional<size_t> maybe_player_index =
+              room.playerIndexOfConnection(incoming_msg->m_conn);
+          if (!maybe_player_index.has_value()) {
+            continue;
+          }
+          size_t player_index = maybe_player_index.value();
+          if (room.room_state.state == RS_WAITING) {
+            // do nothing
+          } else {
+            // if not, consume player inputs
+            for (const InputMessage &i : msg.inputs) {
+              updatePlayerState(room.game_state, i, player_index);
+            }
+            propogateRoomState(room_id);
+          }
         }
       }
       incoming_msg->Release();
@@ -231,6 +256,12 @@ private:
 
     room.room_state.num_connected++;
     connected_clients_[player] = room_id;
+
+    if (room.room_state.num_connected == PLAYERS_PER_ROOM) {
+      room.room_state.state = RS_PLAYING;
+      resetGameState(room.game_state);
+    }
+
     // emplace player into the first empty slot
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (!room.players[i].has_value()) {
@@ -261,6 +292,9 @@ private:
         room.players[i] = std::nullopt;
         connected_clients_[player] = -1;
         room.room_state.num_connected--;
+        if (room.room_state.num_connected != PLAYERS_PER_ROOM) {
+          room.room_state.state = RS_WAITING;
+        }
         propogateRoomState(room_id);
         return true;
       }
@@ -272,9 +306,11 @@ private:
   void propogateRoomState(int room_id) {
     ServerNetworkMessage msg;
     msg.room_state = rooms_[room_id].room_state;
+    msg.game_state = rooms_[room_id].game_state;
 
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (rooms_[room_id].players[i]) {
+        msg.player_number = i;
         sendRequest(msg, rooms_[room_id].players[i].value());
       }
     }
@@ -283,6 +319,7 @@ private:
   ISteamNetworkingSockets *network_interface_ = nullptr;
   HSteamListenSocket socket_;
   HSteamNetPollGroup poll_group_;
+  // maping of player network id -> room index
   std::unordered_map<HSteamNetConnection, int> connected_clients_;
   std::array<Room, MAX_ROOMS> rooms_;
   bool should_quit_ = false;

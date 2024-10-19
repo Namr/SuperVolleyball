@@ -21,14 +21,14 @@ struct RoomRequest {
 };
 
 struct InputMessage {
-  uint32_t tick = 0;
+  double delta_time = 0;
   bool up = false;
   bool down = false;
 
 
   template<class Archive>
   void serialize(Archive & archive) {
-    archive(tick, up, down);
+    archive(delta_time, up, down);
   }
 };
 
@@ -61,12 +61,21 @@ struct RoomState {
 
 struct ServerNetworkMessage {
   std::vector<int> available_rooms;
+  // which player you are in a room, -1 if not in room
+  int player_number = -1;
   RoomState room_state;
   GameState game_state;
 
 
   template<class Archive>
   void serialize(Archive & archive) {
-    archive(available_rooms, room_state, game_state);
+    archive(available_rooms, player_number, room_state, game_state);
   }
 };
+
+
+void updatePlayerState(GameState& state, const InputMessage& input, uint8_t player);
+
+void updateGameState(GameState& state, double delta_time);
+
+void resetGameState(GameState& state);

@@ -2,6 +2,12 @@
 #include <cereal/archives/binary.hpp>
 #include <stdint.h>
 
+constexpr float arena_width = 800.0;
+constexpr float arena_height = 450.0;
+constexpr float paddle_width = 20.0;
+constexpr float paddle_height = 20.0;
+constexpr float paddle_speed = 100.0;
+
 struct Vec2 {
   float x = 0.0;
   float y = 0.0;
