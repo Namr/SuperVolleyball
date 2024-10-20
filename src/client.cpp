@@ -12,6 +12,8 @@ using std::chrono::duration;
 using std::chrono::seconds;
 using std::chrono::steady_clock;
 
+constexpr size_t INPUT_HISTORY_CAPACITY = 30;
+
 class Client {
 public:
   Client() = default;
@@ -73,7 +75,45 @@ public:
       }
 
       room_state = msg.room_state;
-      game_state = msg.game_state;
+      // find the time in our history buffer where this recvd state was computed
+      // from if that state does not match what we recvd, we force update it and
+      // then recompute using future inputs the server presumably has not
+      // consumed yet
+      if (room_state->state == RS_PLAYING) {
+        bool is_recomputing = false;
+        bool found_id = false;
+        GameState running_gamestate;
+        for (std::pair<InputMessage, GameState> &p : input_history) {
+          if (is_recomputing) {
+            updatePlayerState(running_gamestate, p.first, player_index);
+            p.second = running_gamestate;
+          } else {
+            // find the timestamp where this recv'd state was computed from
+            if (p.first.id == msg.last_input_id) {
+              found_id = true;
+              if (msg.game_state != p.second) {
+                is_recomputing = true;
+                p.second = msg.game_state;
+                running_gamestate = msg.game_state;
+              } else {
+                break;
+              }
+            }
+          }
+        }
+
+        // if we had to recompute, update the master gamestate as well
+        if (is_recomputing) {
+          game_state = input_history.back().second;
+        }
+
+        // if we outran our buffer, force a jump
+        if (!found_id) {
+          std::cout << "forced an update" << std::endl;
+          game_state = msg.game_state;
+        }
+      }
+
       player_index = msg.player_number != -1 ? msg.player_number : player_index;
 
       if (!msg.available_rooms.empty()) {
@@ -106,6 +146,13 @@ public:
     ClientNetworkMessage msg;
     msg.room_request.command = RR_MAKE_ROOM;
     sendRequest(msg);
+  }
+
+  void saveFrame(InputMessage input) {
+    input_history.push_back(std::make_pair(input, *game_state));
+    if (input_history.size() > INPUT_HISTORY_CAPACITY) {
+      input_history.pop_front();
+    }
   }
 
   void sendInput(const InputMessage &input) {
@@ -145,6 +192,7 @@ public:
   int player_index = -1;
   std::optional<RoomState> room_state;
   std::optional<GameState> game_state;
+  std::deque<std::pair<InputMessage, GameState>> input_history;
 
 private:
   // singleton-ish structure here s.t we can use C API to call callbacks
@@ -182,7 +230,9 @@ void DrawTextCentered(const std::string &text, int x, int y, int font_size,
 }
 
 InputMessage getInput(float delta_time) {
+  static int input_id = 0;
   InputMessage i;
+  i.id = input_id++;
   i.delta_time = delta_time;
   i.up = IsKeyDown(KEY_UP);
   i.down = IsKeyDown(KEY_DOWN);
@@ -202,6 +252,7 @@ int main() {
   Client client;
   client.start();
   InitWindow(800, 450, "SuperVolleyball");
+  SetTargetFPS(60);
 
   client.updateRoomList();
 
@@ -263,6 +314,8 @@ int main() {
         InputMessage input = getInput(delta_time);
         client.sendInput(input);
         updatePlayerState(*client.game_state, input, client.player_index);
+        updateGameState(*client.game_state, delta_time);
+        client.saveFrame(input);
         drawGameState(*client.game_state);
       }
     }

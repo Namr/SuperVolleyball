@@ -21,6 +21,7 @@ struct RoomRequest {
 };
 
 struct InputMessage {
+  uint32_t id = 0;
   double delta_time = 0;
   bool up = false;
   bool down = false;
@@ -28,7 +29,7 @@ struct InputMessage {
 
   template<class Archive>
   void serialize(Archive & archive) {
-    archive(delta_time, up, down);
+    archive(id, delta_time, up, down);
   }
 };
 
@@ -62,13 +63,14 @@ struct ServerNetworkMessage {
   std::vector<int> available_rooms;
   // which player you are in a room, -1 if not in room
   int player_number = -1;
+  uint32_t last_input_id = -1; // this is PER player, and is the last input id we got from the player
   RoomState room_state;
   GameState game_state;
 
 
   template<class Archive>
   void serialize(Archive & archive) {
-    archive(available_rooms, player_number, room_state, game_state);
+    archive(available_rooms, player_number, last_input_id, room_state, game_state);
   }
 };
 

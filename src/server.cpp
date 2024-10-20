@@ -27,6 +27,7 @@ public:
   RoomState room_state;
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
+  std::array<uint32_t, PLAYERS_PER_ROOM> player_last_input_id;
 
   std::optional<size_t> playerIndexOfConnection(HSteamNetConnection conn) {
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
@@ -38,16 +39,22 @@ public:
   }
 
   void startMatch() {
-    std::scoped_lock l(lock);
     resetGameState(game_state);
     room_state.state = RS_PLAYING;
     game_tick_thread_ = std::thread(&Room::gameLogicThread, this);
   }
 
   void endMatch() {
-    std::scoped_lock l(lock);
-    room_state.state = RS_WAITING;
+    {
+      std::scoped_lock l(lock);
+      room_state.state = RS_WAITING;
+    }
     game_tick_thread_.join();
+  }
+
+  void feedInput(InputMessage input, int player_index) {
+    std::scoped_lock l(lock);
+    message_queue_.push_back(std::make_pair(input, player_index));
   }
 
 private:
@@ -73,6 +80,7 @@ private:
         while (!message_queue_.empty()) {
           std::pair<InputMessage, int> &in = message_queue_.front();
           updatePlayerState(game_state, in.first, in.second);
+          player_last_input_id[in.second] = in.first.id;
           message_queue_.pop_front();
         }
 
@@ -235,9 +243,9 @@ private:
           if (room.room_state.state == RS_WAITING) {
             // do nothing
           } else {
-            // if not, consume player inputs
+            // if not, feed player inputs
             for (const InputMessage &i : msg.inputs) {
-              updatePlayerState(room.game_state, i, player_index);
+              room.feedInput(i, player_index);
             }
             propogateRoomState(room_id);
           }
@@ -380,6 +388,10 @@ private:
 
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (rooms_[room_id].players[i]) {
+        {
+          std::scoped_lock l(rooms_[room_id].lock);
+          msg.last_input_id = rooms_[room_id].player_last_input_id[i];
+        }
         msg.player_number = i;
         sendRequest(msg, rooms_[room_id].players[i].value());
       }
