@@ -44,8 +44,7 @@ struct ClientNetworkMessage {
 };
 
 #define RS_WAITING  0
-#define RS_READY  1
-#define RS_PLAYING  2
+#define RS_PLAYING  1
 
 struct RoomState {
   uint16_t state = RS_WAITING;

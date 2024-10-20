@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <optional>
@@ -10,11 +11,19 @@
 
 #include "network_signals.hpp"
 
+using std::chrono::duration;
+using std::chrono::seconds;
+using std::chrono::steady_clock;
+
 constexpr uint16_t PORT = 25565;
 constexpr size_t MAX_ROOMS = 16;
 constexpr size_t PLAYERS_PER_ROOM = 2;
+constexpr float TICK_RATE = 30.0;
+constexpr float DESIRED_FRAME_LENGTH = 1.0 / TICK_RATE;
 
-struct Room {
+class Room {
+public:
+  std::mutex lock;
   RoomState room_state;
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
@@ -26,6 +35,65 @@ struct Room {
       }
     }
     return std::nullopt;
+  }
+
+  void startMatch() {
+    std::scoped_lock l(lock);
+    resetGameState(game_state);
+    room_state.state = RS_PLAYING;
+    game_tick_thread_ = std::thread(&Room::gameLogicThread, this);
+  }
+
+  void endMatch() {
+    std::scoped_lock l(lock);
+    room_state.state = RS_WAITING;
+    game_tick_thread_.join();
+  }
+
+private:
+  // game logic thread
+  std::deque<std::pair<InputMessage, int>>
+      message_queue_; // pair (input, player_idx)
+  std::thread game_tick_thread_;
+
+  void gameLogicThread() {
+    float delta_time = 0.0;
+    while (true) {
+      auto frame_start = steady_clock::now();
+
+      // lock room state
+      {
+        std::scoped_lock l(lock);
+        // should we exit?
+        if (room_state.state != RS_PLAYING) {
+          return;
+        }
+
+        // consume inputs
+        while (!message_queue_.empty()) {
+          std::pair<InputMessage, int> &in = message_queue_.front();
+          updatePlayerState(game_state, in.first, in.second);
+          message_queue_.pop_front();
+        }
+
+        // move game logic forward
+        updateGameState(game_state, delta_time);
+      }
+
+      // sleep s.t we tick at the correct rate
+      // TODO: just record the delta_time in ms to start with...
+      delta_time =
+          static_cast<duration<float>>(steady_clock::now() - frame_start)
+              .count();
+      float sleep_time = DESIRED_FRAME_LENGTH - delta_time;
+      if (sleep_time > 0.0) {
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds((int)(sleep_time * 1000.0)));
+        delta_time =
+            static_cast<duration<float>>(steady_clock::now() - frame_start)
+                .count();
+      }
+    }
   }
 };
 
@@ -258,8 +326,7 @@ private:
     connected_clients_[player] = room_id;
 
     if (room.room_state.num_connected == PLAYERS_PER_ROOM) {
-      room.room_state.state = RS_PLAYING;
-      resetGameState(room.game_state);
+      room.startMatch();
     }
 
     // emplace player into the first empty slot
@@ -293,7 +360,7 @@ private:
         connected_clients_[player] = -1;
         room.room_state.num_connected--;
         if (room.room_state.num_connected != PLAYERS_PER_ROOM) {
-          room.room_state.state = RS_WAITING;
+          room.endMatch();
         }
         propogateRoomState(room_id);
         return true;
@@ -305,8 +372,11 @@ private:
 
   void propogateRoomState(int room_id) {
     ServerNetworkMessage msg;
-    msg.room_state = rooms_[room_id].room_state;
-    msg.game_state = rooms_[room_id].game_state;
+    {
+      std::scoped_lock lock(rooms_[room_id].lock);
+      msg.room_state = rooms_[room_id].room_state;
+      msg.game_state = rooms_[room_id].game_state;
+    }
 
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (rooms_[room_id].players[i]) {

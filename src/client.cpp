@@ -9,7 +9,6 @@
 #include "network_signals.hpp"
 
 using std::chrono::duration;
-using std::chrono::duration_cast;
 using std::chrono::seconds;
 using std::chrono::steady_clock;
 
@@ -76,7 +75,6 @@ public:
       room_state = msg.room_state;
       game_state = msg.game_state;
       player_index = msg.player_number != -1 ? msg.player_number : player_index;
-      std::cout << "index" << player_index << std::endl;
 
       if (!msg.available_rooms.empty()) {
         rooms = std::move(msg.available_rooms);
@@ -192,8 +190,12 @@ InputMessage getInput(float delta_time) {
 }
 
 void drawGameState(const GameState &state) {
-  DrawCircle((int)state.p1_paddle.pos.x, (int)state.p1_paddle.pos.y, 20, WHITE);
-  DrawCircle((int)state.p2_paddle.pos.x, (int)state.p2_paddle.pos.y, 20, WHITE);
+  DrawRectangle((int)state.p1_paddle.pos.x, (int)state.p1_paddle.pos.y,
+                (int)paddle_width, (int)paddle_height, WHITE);
+  DrawRectangle((int)state.p2_paddle.pos.x, (int)state.p2_paddle.pos.y,
+                (int)paddle_width, (int)paddle_height, WHITE);
+
+  DrawCircle((int)state.ball.pos.x, (int)state.ball.pos.y, ball_radius, WHITE);
 }
 
 int main() {

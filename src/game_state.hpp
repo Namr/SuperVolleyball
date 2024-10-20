@@ -5,8 +5,10 @@
 constexpr float arena_width = 800.0;
 constexpr float arena_height = 450.0;
 constexpr float paddle_width = 20.0;
-constexpr float paddle_height = 20.0;
-constexpr float paddle_speed = 100.0;
+constexpr float paddle_height = 60.0;
+constexpr float paddle_speed = 150.0;
+constexpr float ball_radius = 15.0;
+constexpr float ball_speed = 200.0;
 
 struct Vec2 {
   float x = 0.0;
