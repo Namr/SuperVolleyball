@@ -1,6 +1,9 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <optional>
+#include <queue>
+#include <algorithm>
 
 #include <raylib.h>
 #include <steam/isteamnetworkingutils.h>
@@ -297,7 +300,7 @@ int main() {
         selected_room--;
       }
 
-      selected_room = std::clamp(selected_room, 0UL, client.rooms.size() - 1);
+      selected_room = std::clamp(selected_room, (size_t) 0, (size_t) client.rooms.size() - 1);
     } else {
       if (client.room_state->state == RS_WAITING) {
         // wait for match to start

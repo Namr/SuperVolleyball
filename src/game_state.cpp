@@ -1,4 +1,5 @@
 #include "network_signals.hpp"
+#include <algorithm>
 
 void resetGameState(GameState &state) {
   state.p1_paddle.vel.x = 0;

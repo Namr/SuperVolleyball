@@ -8,6 +8,9 @@
 #include <strstream>
 #include <thread>
 #include <unordered_map>
+#include <mutex>
+#include <queue>
+#include <array>
 
 #include "network_signals.hpp"
 
@@ -73,7 +76,7 @@ private:
         std::scoped_lock l(lock);
         // should we exit?
         if (room_state.state != RS_PLAYING) {
-          return;
+          break;
         }
 
         // consume inputs
@@ -367,7 +370,7 @@ private:
         room.players[i] = std::nullopt;
         connected_clients_[player] = -1;
         room.room_state.num_connected--;
-        if (room.room_state.num_connected != PLAYERS_PER_ROOM) {
+        if (room.room_state.num_connected != PLAYERS_PER_ROOM && room.room_state.state == RS_PLAYING) {
           room.endMatch();
         }
         propogateRoomState(room_id);
