@@ -35,7 +35,7 @@ public:
     // connect to server
     // TODO set server address from raylib input
     SteamNetworkingIPAddr server_address;
-    server_address.ParseString("127.0.0.1:25565");
+    server_address.ParseString("64.23.207.248:25565");
     SteamNetworkingConfigValue_t opt;
     opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
                (void *)connectionStatusCallback);
