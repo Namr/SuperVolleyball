@@ -1,16 +1,16 @@
+#include <array>
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <optional>
+#include <queue>
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingsockets.h>
 #include <string>
 #include <strstream>
 #include <thread>
 #include <unordered_map>
-#include <mutex>
-#include <queue>
-#include <array>
 
 #include "network_signals.hpp"
 
@@ -370,7 +370,8 @@ private:
         room.players[i] = std::nullopt;
         connected_clients_[player] = -1;
         room.room_state.num_connected--;
-        if (room.room_state.num_connected != PLAYERS_PER_ROOM && room.room_state.state == RS_PLAYING) {
+        if (room.room_state.num_connected != PLAYERS_PER_ROOM &&
+            room.room_state.state == RS_PLAYING) {
           room.endMatch();
         }
         propogateRoomState(room_id);

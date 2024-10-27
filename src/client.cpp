@@ -1,9 +1,9 @@
+#include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <string>
 #include <optional>
 #include <queue>
-#include <algorithm>
+#include <string>
 
 #include <raylib.h>
 #include <steam/isteamnetworkingutils.h>
@@ -243,12 +243,40 @@ InputMessage getInput(float delta_time) {
 }
 
 void drawGameState(const GameState &state) {
+  // game pieces
   DrawRectangle((int)state.p1_paddle.pos.x, (int)state.p1_paddle.pos.y,
                 (int)paddle_width, (int)paddle_height, WHITE);
   DrawRectangle((int)state.p2_paddle.pos.x, (int)state.p2_paddle.pos.y,
                 (int)paddle_width, (int)paddle_height, WHITE);
 
-  DrawCircle((int)state.ball.pos.x, (int)state.ball.pos.y, ball_radius, WHITE);
+  DrawRectangle((int)state.ball.pos.x - ball_radius,
+                (int)state.ball.pos.y - ball_radius, (int)ball_radius * 2,
+                (int)ball_radius * 2, WHITE);
+
+  DrawRectangle((int)state.ball.pos.x - ball_radius,
+                (int)state.ball.pos.y - ball_radius, (int)ball_radius * 2,
+                (int)ball_radius * 2, WHITE);
+
+  // divider lines
+  constexpr int num_lines = 6;
+  constexpr int space_between_divider = 30;
+  constexpr int rect_width = 10;
+  constexpr int rect_spacing = (arena_height) / num_lines;
+  constexpr int rect_height = rect_spacing - space_between_divider;
+  for (int i = 0; i < num_lines; i++) {
+    DrawRectangle((int)arena_width / 2.0,
+                  rect_spacing * i + (space_between_divider / 2.0), rect_width,
+                  rect_height, WHITE);
+  }
+
+  // score
+  char p1_score[20];
+  char p2_score[20];
+  snprintf(p1_score, 20, "%d", state.p1_score);
+  snprintf(p2_score, 20, "%d", state.p2_score);
+
+  DrawText(p1_score, (arena_width / 5), 50, 80, WHITE);
+  DrawText(p2_score, 4 * (arena_width / 5), 50, 80, WHITE);
 }
 
 int main() {
@@ -300,7 +328,8 @@ int main() {
         selected_room--;
       }
 
-      selected_room = std::clamp(selected_room, (size_t) 0, (size_t) client.rooms.size() - 1);
+      selected_room =
+          std::clamp(selected_room, (size_t)0, (size_t)client.rooms.size() - 1);
     } else {
       if (client.room_state->state == RS_WAITING) {
         // wait for match to start
