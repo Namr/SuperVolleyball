@@ -19,6 +19,9 @@ constexpr size_t INPUT_HISTORY_CAPACITY = 30;
 constexpr int SCENE_MAIN_MENU = 0;
 constexpr int SCENE_ROOM_SELECT = 1;
 constexpr int SCENE_SETTINGS = 2;
+constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
+    std::make_pair(800, 450), std::make_pair(1280, 820),
+    std::make_pair(1920, 1080), std::make_pair(2560, 1440)};
 
 class Client {
 public:
@@ -293,7 +296,7 @@ public:
 
   void start() {
     client_.start();
-    InitWindow(horizontal_resolution, vertical_resolution, "SuperVolleyball");
+    InitWindow(horizontal_resolution_, vertical_resolution_, "SuperVolleyball");
     SetTargetFPS(60);
     SetExitKey(0);
     client_.updateRoomList();
@@ -346,8 +349,8 @@ private:
   size_t selection_ = 0;
   float delta_time = 0.0;
   int scene_ = SCENE_MAIN_MENU;
-  int horizontal_resolution = 800;
-  int vertical_resolution = 450;
+  int horizontal_resolution_ = 800;
+  int vertical_resolution_ = 450;
 
   void handle_menu_movement(size_t max_selection_value) {
     if (IsKeyReleased(KEY_DOWN)) {
@@ -397,14 +400,27 @@ private:
 
   void settings() {
     std::string resolution = "Resolution: < " +
-                             std::to_string(horizontal_resolution) + " x " +
-                             std::to_string(vertical_resolution) + " >";
+                             std::to_string(horizontal_resolution_) + " x " +
+                             std::to_string(vertical_resolution_) + " >";
     DrawTextCentered(resolution.c_str(), 400, 120, 20, RAYWHITE);
 
     if (IsKeyReleased(KEY_ESCAPE)) {
       scene_ = SCENE_MAIN_MENU;
       selection_ = 0;
     }
+
+    int old_horiz = horizontal_resolution_;
+    int old_vert = vertical_resolution_;
+
+    horizontal_resolution_ = AVAILABLE_RESOLUTIONS[selection_].first;
+    vertical_resolution_ = AVAILABLE_RESOLUTIONS[selection_].second;
+
+    if (old_horiz != horizontal_resolution_ ||
+        old_vert != vertical_resolution_) {
+      SetWindowSize(horizontal_resolution_, vertical_resolution_);
+    }
+
+    handle_menu_movement(AVAILABLE_RESOLUTIONS.size() - 1);
   }
 
   void room_selection() {
