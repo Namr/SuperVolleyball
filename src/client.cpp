@@ -16,6 +16,9 @@ using std::chrono::seconds;
 using std::chrono::steady_clock;
 
 constexpr size_t INPUT_HISTORY_CAPACITY = 30;
+constexpr int SCENE_MAIN_MENU = 0;
+constexpr int SCENE_ROOM_SELECT = 1;
+constexpr int SCENE_SETTINGS = 2;
 
 class Client {
 public:
@@ -28,7 +31,6 @@ public:
       std::cout
           << "ERROR: Failed to Intialize Game Networking Sockets because: "
           << error_msg << std::endl;
-      exit(1);
     }
     network_interface_ = SteamNetworkingSockets();
 
@@ -42,8 +44,7 @@ public:
     connection_ =
         network_interface_->ConnectByIPAddress(server_address, 1, &opt);
     if (connection_ == k_HSteamNetConnection_Invalid) {
-      std::cout << "Could not connect to server" << std::endl;
-      exit(1);
+      std::cout << "Server connection parameters were invalid!" << std::endl;
     }
   }
 
@@ -193,6 +194,7 @@ public:
 
   std::vector<int> rooms;
   int player_index = -1;
+  bool connected = false;
   std::optional<RoomState> room_state;
   std::optional<GameState> game_state;
   std::deque<std::pair<InputMessage, GameState>> input_history;
@@ -210,10 +212,15 @@ private:
   void
   onConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *info) {
     switch (info->m_info.m_eState) {
+    case k_ESteamNetworkingConnectionState_Connected:
+      connected = true;
+      break;
     case k_ESteamNetworkingConnectionState_ClosedByPeer:
     case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
+      connected = false;
       std::cout << "We lost connection the server" << std::endl;
-      exit(1);
+      exit(1); // TODO: maybe try to gracefully exit back to the title screen
+               // instead of crashing?
       break;
     default:
       break;
@@ -279,85 +286,178 @@ void drawGameState(const GameState &state) {
   DrawText(p2_score, 4 * (arena_width / 5), 50, 80, WHITE);
 }
 
-int main() {
-  Client client;
-  client.start();
-  InitWindow(800, 450, "SuperVolleyball");
-  SetTargetFPS(60);
+class Game {
+public:
+  Game() = default;
+  ~Game() { CloseWindow(); }
 
-  client.updateRoomList();
+  void start() {
+    client_.start();
+    InitWindow(horizontal_resolution, vertical_resolution, "SuperVolleyball");
+    SetTargetFPS(60);
+    SetExitKey(0);
+    client_.updateRoomList();
+  }
 
-  size_t selected_room = 0;
-  float delta_time = 0.0;
-  while (!WindowShouldClose()) {
-    auto frame_start = steady_clock::now();
-    BeginDrawing();
-    client.runCallbacks();
-    client.processIncomingMessages();
-    ClearBackground(BLACK);
-    // handle joining rooms
-    if (client.room_state == std::nullopt ||
-        client.room_state->current_room == -1) {
-      DrawTextCentered("Welcome to SuperVolleyball!", 400, 0, 20, RAYWHITE);
-      DrawTextCentered(
-          "Press R to refresh room list or press C to make a new room", 400, 20,
-          20, RAYWHITE);
-      DrawTextCentered("Rooms:", 400, 40, 20, RAYWHITE);
+  void run() {
+    while (!WindowShouldClose()) {
+      auto frame_start = steady_clock::now();
+      BeginDrawing();
+      client_.runCallbacks();
+      client_.processIncomingMessages();
+      ClearBackground(BLACK);
 
-      int line_start = 60;
-      for (int i = 0; i < client.rooms.size(); i++) {
-        if (i == selected_room) {
-          std::string text = "< " + std::to_string(client.rooms[i]) + " >";
-          DrawText(text.c_str(), 400, line_start, 20, RAYWHITE);
-        } else {
-          DrawText(std::to_string(client.rooms[i]).c_str(), 400, line_start, 20,
-                   RAYWHITE);
+      // menu system
+      if (!client_.connected || scene_ != SCENE_ROOM_SELECT) {
+        switch (scene_) {
+        default:
+        case SCENE_MAIN_MENU:
+          main_menu();
+          break;
+        case SCENE_SETTINGS:
+          settings();
+          break;
         }
-        line_start += 20;
-      }
-
-      if (IsKeyReleased(KEY_C)) {
-        client.makeRoom();
-      } else if (IsKeyReleased(KEY_R)) {
-        client.updateRoomList();
-      } else if (IsKeyReleased(KEY_ENTER)) {
-        client.joinRoom(client.rooms[selected_room]);
-      } else if (IsKeyReleased(KEY_DOWN)) {
-        selected_room++;
-      } else if (IsKeyReleased(KEY_UP)) {
-        selected_room--;
-      }
-
-      selected_room =
-          std::clamp(selected_room, (size_t)0, (size_t)client.rooms.size() - 1);
-    } else {
-      if (client.room_state->state == RS_WAITING) {
-        // wait for match to start
-        std::string room_id = "you are in room: " +
-                              std::to_string(client.room_state->current_room);
-        std::string room_members =
-            "there are " + std::to_string(client.room_state->num_connected) +
-            " players here";
-        DrawTextCentered(room_id.c_str(), 400, 100, 20, LIGHTGRAY);
-        DrawTextCentered(room_members.c_str(), 400, 120, 20, LIGHTGRAY);
       } else {
-        // actually play the match
+        // handle joining rooms & playing the game, this depends just
+        // on the state the server sends so we don't use the scene state machine
+        // anymore
+        if (client_.room_state == std::nullopt ||
+            client_.room_state->current_room == -1) {
+          room_selection();
+        } else {
+          if (client_.room_state->state == RS_WAITING) {
+            wait_for_match_start();
+          } else {
+            play_game();
+          }
+        }
+      }
 
-        InputMessage input = getInput(delta_time);
-        client.sendInput(input);
-        updatePlayerState(*client.game_state, input, client.player_index);
-        updateGameState(*client.game_state, delta_time);
-        client.saveFrame(input);
-        drawGameState(*client.game_state);
+      EndDrawing();
+      delta_time =
+          static_cast<duration<float>>(steady_clock::now() - frame_start)
+              .count();
+    }
+  }
+
+private:
+  Client client_;
+  size_t selection_ = 0;
+  float delta_time = 0.0;
+  int scene_ = SCENE_MAIN_MENU;
+  int horizontal_resolution = 800;
+  int vertical_resolution = 450;
+
+  void handle_menu_movement(size_t max_selection_value) {
+    if (IsKeyReleased(KEY_DOWN)) {
+      selection_++;
+    } else if (IsKeyReleased(KEY_UP)) {
+      selection_--;
+    }
+
+    selection_ = std::clamp(selection_, (size_t)0, max_selection_value);
+  }
+
+  void main_menu() {
+    DrawTextCentered("Welcome to SuperVolleyball!", 400, 120, 20, RAYWHITE);
+
+    if (client_.connected) {
+      if (selection_ == 0) {
+        DrawTextCentered("< Play >", 400, 160, 20, RAYWHITE);
+      } else {
+        DrawTextCentered("Play", 400, 160, 20, RAYWHITE);
+      }
+    } else {
+      if (selection_ == 0) {
+        DrawTextCentered("< Connecting to server... >", 400, 160, 20, RAYWHITE);
+      } else {
+        DrawTextCentered("Connecting to server...", 400, 160, 20, RAYWHITE);
       }
     }
 
-    EndDrawing();
-    delta_time =
-        static_cast<duration<float>>(steady_clock::now() - frame_start).count();
+    if (selection_ == 1) {
+      DrawTextCentered("< Settings >", 400, 200, 20, RAYWHITE);
+    } else {
+      DrawTextCentered("Settings", 400, 200, 20, RAYWHITE);
+    }
+
+    if (IsKeyReleased(KEY_ENTER)) {
+      if (selection_ == 0 && client_.connected) {
+        scene_ = SCENE_ROOM_SELECT;
+        selection_ = 0;
+      } else if (selection_ == 1) {
+        scene_ = SCENE_SETTINGS;
+        selection_ = 0;
+      }
+    }
+
+    handle_menu_movement(1);
   }
 
-  CloseWindow();
+  void settings() {
+    std::string resolution = "Resolution: < " +
+                             std::to_string(horizontal_resolution) + " x " +
+                             std::to_string(vertical_resolution) + " >";
+    DrawTextCentered(resolution.c_str(), 400, 120, 20, RAYWHITE);
 
+    if (IsKeyReleased(KEY_ESCAPE)) {
+      scene_ = SCENE_MAIN_MENU;
+      selection_ = 0;
+    }
+  }
+
+  void room_selection() {
+    DrawTextCentered(
+        "Press R to refresh room list or press C to make a new room", 400, 20,
+        20, RAYWHITE);
+    DrawTextCentered("Rooms:", 400, 40, 20, RAYWHITE);
+
+    int line_start = 60;
+    for (int i = 0; i < client_.rooms.size(); i++) {
+      if (i == selection_) {
+        std::string text = "< " + std::to_string(client_.rooms[i]) + " >";
+        DrawText(text.c_str(), 400, line_start, 20, RAYWHITE);
+      } else {
+        DrawText(std::to_string(client_.rooms[i]).c_str(), 400, line_start, 20,
+                 RAYWHITE);
+      }
+      line_start += 20;
+    }
+
+    if (IsKeyReleased(KEY_C)) {
+      client_.makeRoom();
+    } else if (IsKeyReleased(KEY_R)) {
+      client_.updateRoomList();
+    } else if (IsKeyReleased(KEY_ENTER)) {
+      client_.joinRoom(client_.rooms[selection_]);
+    }
+    handle_menu_movement(client_.rooms.size() - 1);
+  }
+
+  void wait_for_match_start() {
+    std::string room_id =
+        "you are in room: " + std::to_string(client_.room_state->current_room);
+    std::string room_members =
+        "there are " + std::to_string(client_.room_state->num_connected) +
+        " players here";
+    DrawTextCentered(room_id.c_str(), 400, 100, 20, LIGHTGRAY);
+    DrawTextCentered(room_members.c_str(), 400, 120, 20, LIGHTGRAY);
+  }
+
+  void play_game() {
+    InputMessage input = getInput(delta_time);
+    client_.sendInput(input);
+    updatePlayerState(*client_.game_state, input, client_.player_index);
+    updateGameState(*client_.game_state, delta_time);
+    client_.saveFrame(input);
+    drawGameState(*client_.game_state);
+  }
+};
+
+int main() {
+  Game game;
+  game.start();
+  game.run();
   return 0;
 }

@@ -5,10 +5,10 @@
 #include <stdint.h>
 #include <vector>
 
-#define RR_NO_REQUEST 0
-#define RR_LIST_ROOMS 1
-#define RR_JOIN_ROOM 2
-#define RR_MAKE_ROOM 3
+constexpr int RR_NO_REQUEST = 0;
+constexpr int RR_LIST_ROOMS = 1;
+constexpr int RR_JOIN_ROOM = 2;
+constexpr int RR_MAKE_ROOM = 3;
 
 struct RoomRequest {
   uint64_t command = RR_NO_REQUEST;
@@ -39,8 +39,8 @@ struct ClientNetworkMessage {
   }
 };
 
-#define RS_WAITING 0
-#define RS_PLAYING 1
+constexpr int RS_WAITING = 0;
+constexpr int RS_PLAYING = 1;
 
 struct RoomState {
   uint16_t state = RS_WAITING;
