@@ -84,7 +84,9 @@ private:
         while (!message_queue_.empty()) {
           std::pair<InputMessage, int> &in = message_queue_.front();
           double player_delta = time - in.first.time;
-          updatePlayerState(game_state, in.first, player_delta, in.second);
+          if(player_delta > 0) {
+            updatePlayerState(game_state, in.first, player_delta, in.second);
+          }
           message_queue_.pop_front();
         }
 
