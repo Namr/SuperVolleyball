@@ -255,31 +255,27 @@ InputMessage getInput(double time) {
   return i;
 }
 
-void drawGameState(const GameState &state) {
+void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // game pieces
-  DrawRectangle((int)state.p1_paddle.pos.x, (int)state.p1_paddle.pos.y,
-                (int)paddle_width, (int)paddle_height, WHITE);
-  DrawRectangle((int)state.p2_paddle.pos.x, (int)state.p2_paddle.pos.y,
-                (int)paddle_width, (int)paddle_height, WHITE);
+  DrawRectangle((int)state.p1_paddle.pos.x * w_ratio, (int)state.p1_paddle.pos.y * h_ratio,
+                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio, WHITE);
+  DrawRectangle((int)state.p2_paddle.pos.x * w_ratio, (int)state.p2_paddle.pos.y * h_ratio,
+                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio, WHITE);
 
-  DrawRectangle((int)state.ball.pos.x - ball_radius,
-                (int)state.ball.pos.y - ball_radius, (int)ball_radius * 2,
-                (int)ball_radius * 2, WHITE);
-
-  DrawRectangle((int)state.ball.pos.x - ball_radius,
-                (int)state.ball.pos.y - ball_radius, (int)ball_radius * 2,
-                (int)ball_radius * 2, WHITE);
+  DrawRectangle((int)(state.ball.pos.x - ball_radius) * w_ratio,
+                (int)(state.ball.pos.y - ball_radius) * h_ratio, (int)ball_radius * 2 * w_ratio,
+                (int)ball_radius * 2 * h_ratio, WHITE);
 
   // divider lines
   constexpr int num_lines = 6;
-  constexpr int space_between_divider = 30;
-  constexpr int rect_width = 10;
-  constexpr int rect_spacing = (arena_height) / num_lines;
-  constexpr int rect_height = rect_spacing - space_between_divider;
+  const int space_between_divider = 30 * h_ratio;
+  const int rect_width = 10 * w_ratio;
+  const int rect_spacing = ((arena_height * h_ratio) / num_lines);
+  const int rect_height = rect_spacing - space_between_divider;
   for (int i = 0; i < num_lines; i++) {
-    DrawRectangle((int)arena_width / 2.0,
-                  rect_spacing * i + (space_between_divider / 2.0), rect_width,
-                  rect_height, WHITE);
+    DrawRectangle((int)(arena_width / 2.0) * w_ratio,
+                  (rect_spacing * i + (space_between_divider / 2.0)), rect_width,
+                  (rect_height), WHITE);
   }
 
   // score
@@ -288,8 +284,8 @@ void drawGameState(const GameState &state) {
   snprintf(p1_score, 20, "%d", state.p1_score);
   snprintf(p2_score, 20, "%d", state.p2_score);
 
-  DrawText(p1_score, (arena_width / 5), 50, 80, WHITE);
-  DrawText(p2_score, 4 * (arena_width / 5), 50, 80, WHITE);
+  DrawText(p1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio, WHITE);
+  DrawText(p2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio, WHITE);
 }
 
 class Game {
@@ -356,6 +352,8 @@ private:
   int scene_ = SCENE_MAIN_MENU;
   int horizontal_resolution_ = 800;
   int vertical_resolution_ = 450;
+  double w_ratio_ =  horizontal_resolution_ / arena_width;
+  double h_ratio_ = vertical_resolution_ / arena_height;
 
   void handle_menu_movement(size_t max_selection_value) {
     if (IsKeyReleased(KEY_DOWN)) {
@@ -368,26 +366,26 @@ private:
   }
 
   void main_menu() {
-    DrawTextCentered("Welcome to SuperVolleyball!", 400, 120, 20, RAYWHITE);
+    DrawTextCentered("Welcome to SuperVolleyball!", 400 * w_ratio_, 120 * h_ratio_, 20 * h_ratio_, RAYWHITE);
 
     if (client_.connected) {
       if (selection_ == 0) {
-        DrawTextCentered("< Play >", 400, 160, 20, RAYWHITE);
+        DrawTextCentered("< Play >", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
       } else {
-        DrawTextCentered("Play", 400, 160, 20, RAYWHITE);
+        DrawTextCentered("Play", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
       }
     } else {
       if (selection_ == 0) {
-        DrawTextCentered("< Connecting to server... >", 400, 160, 20, RAYWHITE);
+        DrawTextCentered("< Connecting to server... >", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
       } else {
-        DrawTextCentered("Connecting to server...", 400, 160, 20, RAYWHITE);
+        DrawTextCentered("Connecting to server...", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
       }
     }
 
     if (selection_ == 1) {
-      DrawTextCentered("< Settings >", 400, 200, 20, RAYWHITE);
+      DrawTextCentered("< Settings >", 400 * w_ratio_, 200 * h_ratio_, 20 * h_ratio_, RAYWHITE);
     } else {
-      DrawTextCentered("Settings", 400, 200, 20, RAYWHITE);
+      DrawTextCentered("Settings", 400 * w_ratio_, 200 * h_ratio_, 20 * h_ratio_, RAYWHITE);
     }
 
     if (IsKeyReleased(KEY_ENTER)) {
@@ -407,11 +405,12 @@ private:
     std::string resolution = "Resolution: < " +
                              std::to_string(horizontal_resolution_) + " x " +
                              std::to_string(vertical_resolution_) + " >";
-    DrawTextCentered(resolution.c_str(), 400, 120, 20, RAYWHITE);
+    DrawTextCentered(resolution.c_str(), 400 * w_ratio_, 120 * h_ratio_, 20 * h_ratio_, RAYWHITE);
 
     if (IsKeyReleased(KEY_ESCAPE)) {
       scene_ = SCENE_MAIN_MENU;
       selection_ = 0;
+      return;
     }
 
     int old_horiz = horizontal_resolution_;
@@ -419,6 +418,8 @@ private:
 
     horizontal_resolution_ = AVAILABLE_RESOLUTIONS[selection_].first;
     vertical_resolution_ = AVAILABLE_RESOLUTIONS[selection_].second;
+    w_ratio_ =  horizontal_resolution_ / arena_width;
+    h_ratio_ = vertical_resolution_ / arena_height;
 
     if (old_horiz != horizontal_resolution_ ||
         old_vert != vertical_resolution_) {
@@ -430,17 +431,16 @@ private:
 
   void room_selection() {
     DrawTextCentered(
-        "Press R to refresh room list or press C to make a new room", 400, 20,
-        20, RAYWHITE);
-    DrawTextCentered("Rooms:", 400, 40, 20, RAYWHITE);
+        "Press R to refresh room list or press C to make a new room", 400 * w_ratio_, 20 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+    DrawTextCentered("Rooms:", 400 * w_ratio_, 40 * h_ratio_, 20 * h_ratio_, RAYWHITE);
 
     int line_start = 60;
     for (int i = 0; i < client_.rooms.size(); i++) {
       if (i == selection_) {
         std::string text = "< " + std::to_string(client_.rooms[i]) + " >";
-        DrawText(text.c_str(), 400, line_start, 20, RAYWHITE);
+        DrawText(text.c_str(), 400 * w_ratio_, line_start * h_ratio_, 20 * h_ratio_, RAYWHITE);
       } else {
-        DrawText(std::to_string(client_.rooms[i]).c_str(), 400, line_start, 20,
+        DrawText(std::to_string(client_.rooms[i]).c_str(), 400 * w_ratio_, line_start * h_ratio_, 20 * h_ratio_,
                  RAYWHITE);
       }
       line_start += 20;
@@ -462,8 +462,8 @@ private:
     std::string room_members =
         "there are " + std::to_string(client_.room_state->num_connected) +
         " players here";
-    DrawTextCentered(room_id.c_str(), 400, 100, 20, LIGHTGRAY);
-    DrawTextCentered(room_members.c_str(), 400, 120, 20, LIGHTGRAY);
+    DrawTextCentered(room_id.c_str(), 400 * w_ratio_, 100 * h_ratio_, 20 * h_ratio_, LIGHTGRAY);
+    DrawTextCentered(room_members.c_str(), 400 * w_ratio_, 120 * h_ratio_, 20 * h_ratio_, LIGHTGRAY);
   }
 
   void play_game() {
@@ -475,7 +475,7 @@ private:
                       client_.player_index);
     updateGameState(*client_.game_state, delta_time_);
     client_.saveFrame(input);
-    drawGameState(*client_.game_state);
+    drawGameState(*client_.game_state, horizontal_resolution_ / arena_width, vertical_resolution_ / arena_height);
   }
 };
 
