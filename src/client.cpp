@@ -86,22 +86,27 @@ public:
       // from if that state does not match what we recvd, we force update it and
       // then recompute using future inputs the server presumably has not
       // consumed yet
+      constexpr double FRAME_EPSILON = 1.0 / 60.0;
       if (room_state->state == RS_PLAYING) {
         bool is_recomputing = false;
         bool found_id = false;
         GameState running_gamestate;
         for (std::pair<InputMessage, GameState> &p : input_history) {
           if (is_recomputing) {
-            updatePlayerState(running_gamestate, p.first, player_index);
+            double delta_time = (p.first.time - running_gamestate.time);
+            updatePlayerState(running_gamestate, p.first, delta_time,
+                              player_index);
+            running_gamestate.time = p.first.time;
             p.second = running_gamestate;
           } else {
             // find the timestamp where this recv'd state was computed from
-            if (p.first.id == msg.last_input_id) {
+            if (std::abs(p.first.time - msg.game_state.time) < FRAME_EPSILON) {
               found_id = true;
               if (msg.game_state != p.second) {
                 is_recomputing = true;
                 p.second = msg.game_state;
                 running_gamestate = msg.game_state;
+                running_gamestate.time = p.first.time;
               } else {
                 break;
               }
@@ -116,8 +121,8 @@ public:
 
         // if we outran our buffer, force a jump
         if (!found_id) {
-          std::cout << "forced an update" << std::endl;
           game_state = msg.game_state;
+          game_state->time += 1 / 60.0;
         }
       }
 
@@ -242,11 +247,9 @@ void DrawTextCentered(const std::string &text, int x, int y, int font_size,
   DrawText(text.c_str(), x - width, y, font_size, color);
 }
 
-InputMessage getInput(float delta_time) {
-  static int input_id = 0;
+InputMessage getInput(double time) {
   InputMessage i;
-  i.id = input_id++;
-  i.delta_time = delta_time;
+  i.time = time;
   i.up = IsKeyDown(KEY_UP);
   i.down = IsKeyDown(KEY_DOWN);
   return i;
@@ -333,12 +336,13 @@ public:
             wait_for_match_start();
           } else {
             play_game();
+            time_ += delta_time_;
           }
         }
       }
 
       EndDrawing();
-      delta_time =
+      delta_time_ =
           static_cast<duration<float>>(steady_clock::now() - frame_start)
               .count();
     }
@@ -347,7 +351,8 @@ public:
 private:
   Client client_;
   size_t selection_ = 0;
-  float delta_time = 0.0;
+  float delta_time_ = 0.0;
+  double time_ = 0.0;
   int scene_ = SCENE_MAIN_MENU;
   int horizontal_resolution_ = 800;
   int vertical_resolution_ = 450;
@@ -462,10 +467,13 @@ private:
   }
 
   void play_game() {
-    InputMessage input = getInput(delta_time);
+    time_ = client_.game_state->time;
+    InputMessage input = getInput(time_);
     client_.sendInput(input);
-    updatePlayerState(*client_.game_state, input, client_.player_index);
-    updateGameState(*client_.game_state, delta_time);
+
+    updatePlayerState(*client_.game_state, input, delta_time_,
+                      client_.player_index);
+    updateGameState(*client_.game_state, delta_time_);
     client_.saveFrame(input);
     drawGameState(*client_.game_state);
   }

@@ -41,7 +41,7 @@ void resetRound(GameState &state) {
 }
 
 void updatePlayerState(GameState &state, const InputMessage &input,
-                       uint8_t player) {
+                       const double delta_time, uint8_t player) {
   PhysicsState &paddle = player == 0 ? state.p1_paddle : state.p2_paddle;
   if (input.up) {
     paddle.vel.y = -paddle_speed;
@@ -54,8 +54,8 @@ void updatePlayerState(GameState &state, const InputMessage &input,
     paddle.vel.y = 0.0;
   }
 
-  paddle.pos.x += paddle.vel.x * input.delta_time;
-  paddle.pos.y += paddle.vel.y * input.delta_time;
+  paddle.pos.x += paddle.vel.x * delta_time;
+  paddle.pos.y += paddle.vel.y * delta_time;
 
   paddle.pos.x = std::clamp(paddle.pos.x, 0.0f, arena_width);
   paddle.pos.y = std::clamp(paddle.pos.y, 0.0f, arena_height - paddle_height);

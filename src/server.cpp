@@ -21,7 +21,7 @@ using std::chrono::steady_clock;
 constexpr uint16_t PORT = 25565;
 constexpr size_t MAX_ROOMS = 16;
 constexpr size_t PLAYERS_PER_ROOM = 2;
-constexpr float TICK_RATE = 30.0;
+constexpr float TICK_RATE = 65.0;
 constexpr float DESIRED_FRAME_LENGTH = 1.0 / TICK_RATE;
 
 class Room {
@@ -30,7 +30,6 @@ public:
   RoomState room_state;
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
-  std::array<uint32_t, PLAYERS_PER_ROOM> player_last_input_id;
 
   std::optional<size_t> playerIndexOfConnection(HSteamNetConnection conn) {
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
@@ -67,7 +66,9 @@ private:
   std::thread game_tick_thread_;
 
   void gameLogicThread() {
-    float delta_time = 0.0;
+    double delta_time = 0.0;
+    double time = 0.0;
+
     while (true) {
       auto frame_start = steady_clock::now();
 
@@ -82,13 +83,14 @@ private:
         // consume inputs
         while (!message_queue_.empty()) {
           std::pair<InputMessage, int> &in = message_queue_.front();
-          updatePlayerState(game_state, in.first, in.second);
-          player_last_input_id[in.second] = in.first.id;
+          double player_delta = time - in.first.time;
+          updatePlayerState(game_state, in.first, player_delta, in.second);
           message_queue_.pop_front();
         }
 
         // move game logic forward
         updateGameState(game_state, delta_time);
+        game_state.time = time;
       }
 
       // sleep s.t we tick at the correct rate
@@ -104,6 +106,7 @@ private:
             static_cast<duration<float>>(steady_clock::now() - frame_start)
                 .count();
       }
+      time += delta_time;
     }
   }
 };
@@ -392,10 +395,6 @@ private:
 
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (rooms_[room_id].players[i]) {
-        {
-          std::scoped_lock l(rooms_[room_id].lock);
-          msg.last_input_id = rooms_[room_id].player_last_input_id[i];
-        }
         msg.player_number = i;
         sendRequest(msg, rooms_[room_id].players[i].value());
       }
