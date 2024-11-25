@@ -4,7 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <optional>
-#include <queue>
+#include <list>
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingsockets.h>
 #include <string>
@@ -19,10 +19,7 @@ using std::chrono::seconds;
 using std::chrono::steady_clock;
 
 constexpr uint16_t PORT = 25565;
-constexpr size_t MAX_ROOMS = 16;
-constexpr size_t PLAYERS_PER_ROOM = 2;
-constexpr float TICK_RATE = 65.0;
-constexpr float DESIRED_FRAME_LENGTH = 1.0 / TICK_RATE;
+constexpr uint32_t CLIENT_RUNWAY = 6;
 
 class Room {
 public:
@@ -30,7 +27,8 @@ public:
   RoomState room_state;
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
-
+  std::function<void()> propogate_state_callback;
+  
   std::optional<size_t> playerIndexOfConnection(HSteamNetConnection conn) {
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (this->players[i] == conn) {
@@ -61,16 +59,47 @@ public:
 
 private:
   // game logic thread
-  std::deque<std::pair<InputMessage, int>>
+  std::list<std::pair<InputMessage, int>>
       message_queue_; // pair (input, player_idx)
   std::thread game_tick_thread_;
+  
+  bool areClientsAhead(std::array<bool, PLAYERS_PER_ROOM>& ready_list) {
+    {
+      std::scoped_lock l(lock);
+      for(const auto& pair : message_queue_) {
+        if(pair.first.tick >= CLIENT_RUNWAY) {
+          ready_list[pair.second] = true;
+        }
+      }
+    }
+
+    return std::all_of(
+      std::begin(ready_list), 
+      std::end(ready_list), 
+      [](bool i) { return i; });
+  }
 
   void gameLogicThread() {
+    // wait for clients to get ahead before starting the game loop
+    std::array<bool, PLAYERS_PER_ROOM> ready; // TODO: bitset
+    ready.fill(false);
+    while(!areClientsAhead(ready)) {
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds((int)(DESIRED_TICK_LENGTH * 1000.0)));
+    }
+
     double delta_time = 0.0;
     double time = 0.0;
+    uint32_t tick = 0;
 
+    auto frame_start = steady_clock::now();
+    double time_accumulator = DESIRED_TICK_LENGTH; // this forces a tick on the first frame
+    
+
+    // game loop
     while (true) {
-      auto frame_start = steady_clock::now();
+      double delta_time = static_cast<duration<double>>(steady_clock::now() - frame_start).count();
+      frame_start = steady_clock::now();
 
       // lock room state
       {
@@ -80,35 +109,43 @@ private:
           break;
         }
 
-        // consume inputs
-        while (!message_queue_.empty()) {
-          std::pair<InputMessage, int> &in = message_queue_.front();
-          double player_delta = time - in.first.time;
-          if(player_delta > 0) {
-            updatePlayerState(game_state, in.first, player_delta, in.second);
-          }
-          message_queue_.pop_front();
-        }
+        time_accumulator += delta_time;
 
-        // move game logic forward
-        updateGameState(game_state, delta_time);
-        game_state.time = time;
+        // move game logic forward in equally sized ticks
+        while(time_accumulator >= DESIRED_TICK_LENGTH) {
+          time_accumulator -= DESIRED_TICK_LENGTH;
+
+          // consume inputs that correspond to this tick
+          auto input_iterator = message_queue_.begin();
+          while(input_iterator != message_queue_.end()) {
+            if(input_iterator->first.tick == tick) {
+              updatePlayerState(game_state, input_iterator->first, DESIRED_TICK_LENGTH, input_iterator->second);
+              input_iterator = message_queue_.erase(input_iterator);
+            } else if(input_iterator->first.tick < tick) {
+              std::cout << "client is behind!!! " << input_iterator->first.tick << " vs " << tick << std::endl;
+              input_iterator = message_queue_.erase(input_iterator);
+            } else {
+              input_iterator++;
+            }
+          }
+
+          updateGameState(game_state, DESIRED_TICK_LENGTH);
+          game_state.tick = tick;
+          tick++;
+        }
       }
+      propogate_state_callback();
 
       // sleep s.t we tick at the correct rate
       // TODO: just record the delta_time in ms to start with...
-      delta_time =
+      double elapsed_time =
           static_cast<duration<float>>(steady_clock::now() - frame_start)
               .count();
-      float sleep_time = DESIRED_FRAME_LENGTH - delta_time;
+      float sleep_time = DESIRED_TICK_LENGTH - elapsed_time;
       if (sleep_time > 0.0) {
         std::this_thread::sleep_for(
             std::chrono::milliseconds((int)(sleep_time * 1000.0)));
-        delta_time =
-            static_cast<duration<float>>(steady_clock::now() - frame_start)
-                .count();
       }
-      time += delta_time;
     }
   }
 };
@@ -121,6 +158,7 @@ public:
     // init rooms
     for (int i = 0; i < MAX_ROOMS; i++) {
       rooms_[i].room_state.current_room = i;
+      rooms_[i].propogate_state_callback = std::bind(&Server::propogateRoomState, this, i);
     }
 
     // init connection lib
@@ -255,7 +293,7 @@ private:
             for (const InputMessage &i : msg.inputs) {
               room.feedInput(i, player_index);
             }
-            propogateRoomState(room_id);
+            // propogateRoomState(room_id);
           }
         }
       }

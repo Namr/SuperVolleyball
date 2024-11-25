@@ -20,12 +20,12 @@ struct RoomRequest {
 };
 
 struct InputMessage {
-  double time = 0.0;
+  uint32_t tick = 0;
   bool up = false;
   bool down = false;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(time, up, down);
+    archive(tick, up, down);
   }
 };
 
@@ -52,7 +52,7 @@ struct RoomState {
 };
 
 struct ServerNetworkMessage {
-  std::vector<int> available_rooms;
+  std::vector<int> available_rooms; // TODO: change to bit field
   // which player you are in a room, -1 if not in room
   int player_number = -1;
   RoomState room_state;

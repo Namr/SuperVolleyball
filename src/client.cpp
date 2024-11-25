@@ -40,7 +40,7 @@ public:
     // connect to server
     // TODO set server address from raylib input
     SteamNetworkingIPAddr server_address;
-    server_address.ParseString("64.23.207.248:25565");
+    server_address.ParseString("127.0.0.1:25565");
     SteamNetworkingConfigValue_t opt;
     opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
                (void *)connectionStatusCallback);
@@ -80,33 +80,39 @@ public:
         cereal::BinaryInputArchive dearchive(ss);
         dearchive(msg);
       }
-
+      
+      // detect match start to reset game state
+      if(msg.room_state.state == RS_PLAYING && room_state->state != msg.room_state.state) {
+        resetGameState(game_state);
+      }
       room_state = msg.room_state;
       // find the time in our history buffer where this recvd state was computed
       // from if that state does not match what we recvd, we force update it and
       // then recompute using future inputs the server presumably has not
       // consumed yet
-      constexpr double FRAME_EPSILON = 1.0 / 60.0;
       if (room_state->state == RS_PLAYING) {
         bool is_recomputing = false;
         bool found_id = false;
         GameState running_gamestate;
         for (std::pair<InputMessage, GameState> &p : input_history) {
           if (is_recomputing) {
-            double delta_time = (p.first.time - running_gamestate.time);
-            updatePlayerState(running_gamestate, p.first, delta_time,
+            updatePlayerState(running_gamestate, p.first, DESIRED_TICK_LENGTH,
                               player_index);
-            running_gamestate.time = p.first.time;
+            updateGameState(running_gamestate, DESIRED_TICK_LENGTH);
+            running_gamestate.tick = p.first.tick;
             p.second = running_gamestate;
           } else {
             // find the timestamp where this recv'd state was computed from
-            if (std::abs(p.first.time - msg.game_state.time) < FRAME_EPSILON) {
+            if (msg.game_state.tick == p.first.tick) {
               found_id = true;
               if (msg.game_state != p.second) {
+                std::cout << "disagreement on tick: " << msg.game_state.tick;
+                std::cout << " ( " << msg.game_state.ball.pos.x << ", " << msg.game_state.ball.pos.y << ") vs ";
+                std::cout << " ( " << p.second.ball.pos.x << ", " << p.second.ball.pos.y << ")\n";
                 is_recomputing = true;
                 p.second = msg.game_state;
                 running_gamestate = msg.game_state;
-                running_gamestate.time = p.first.time;
+                running_gamestate.tick = p.first.tick;
               } else {
                 break;
               }
@@ -118,11 +124,10 @@ public:
         if (is_recomputing) {
           game_state = input_history.back().second;
         }
-
-        // if we outran our buffer, force a jump
+        
+        // if we outran our buffer ...?
+        // FIXME: this can lead to a desync lol
         if (!found_id) {
-          game_state = msg.game_state;
-          game_state->time += 1 / 60.0;
         }
       }
 
@@ -161,7 +166,7 @@ public:
   }
 
   void saveFrame(InputMessage input) {
-    input_history.push_back(std::make_pair(input, *game_state));
+    input_history.push_back(std::make_pair(input, game_state));
     if (input_history.size() > INPUT_HISTORY_CAPACITY) {
       input_history.pop_front();
     }
@@ -204,7 +209,7 @@ public:
   int player_index = -1;
   bool connected = false;
   std::optional<RoomState> room_state;
-  std::optional<GameState> game_state;
+  GameState game_state;
   std::deque<std::pair<InputMessage, GameState>> input_history;
 
 private:
@@ -247,9 +252,9 @@ void DrawTextCentered(const std::string &text, int x, int y, int font_size,
   DrawText(text.c_str(), x - width, y, font_size, color);
 }
 
-InputMessage getInput(double time) {
+InputMessage getInput(uint32_t tick) {
   InputMessage i;
-  i.time = time;
+  i.tick = tick;
   i.up = IsKeyDown(KEY_UP);
   i.down = IsKeyDown(KEY_DOWN);
   return i;
@@ -296,14 +301,19 @@ public:
   void start() {
     client_.start();
     InitWindow(horizontal_resolution_, vertical_resolution_, "SuperVolleyball");
-    SetTargetFPS(60);
+    SetTargetFPS(120);
     SetExitKey(0);
     client_.updateRoomList();
   }
 
   void run() {
+    auto frame_start = steady_clock::now();
     while (!WindowShouldClose()) {
-      auto frame_start = steady_clock::now();
+      delta_time_ =
+          static_cast<duration<float>>(steady_clock::now() - frame_start)
+              .count();
+      frame_start = steady_clock::now();
+
       BeginDrawing();
       client_.runCallbacks();
       client_.processIncomingMessages();
@@ -332,23 +342,21 @@ public:
             wait_for_match_start();
           } else {
             play_game();
-            time_ += delta_time_;
           }
         }
       }
-
       EndDrawing();
-      delta_time_ =
-          static_cast<duration<float>>(steady_clock::now() - frame_start)
-              .count();
     }
   }
 
 private:
   Client client_;
   size_t selection_ = 0;
-  float delta_time_ = 0.0;
-  double time_ = 0.0;
+
+  uint32_t tick_ = 0;
+  double delta_time_ = 0.0;
+  double time_accumulator_ = 0.0;
+
   int scene_ = SCENE_MAIN_MENU;
   int horizontal_resolution_ = 800;
   int vertical_resolution_ = 450;
@@ -467,15 +475,24 @@ private:
   }
 
   void play_game() {
-    time_ = client_.game_state->time;
-    InputMessage input = getInput(time_);
-    client_.sendInput(input);
+    time_accumulator_ += delta_time_;
+    while(time_accumulator_ >= DESIRED_TICK_LENGTH) {
+      time_accumulator_ -= DESIRED_TICK_LENGTH;
+      
+      // input handling
+      InputMessage input = getInput(tick_);
+      client_.sendInput(input);
+      
+      // game update
+      updatePlayerState(client_.game_state, input, DESIRED_TICK_LENGTH,
+                        client_.player_index);
+      updateGameState(client_.game_state, DESIRED_TICK_LENGTH);
+      client_.game_state.tick = tick_;
+      client_.saveFrame(input);
+      tick_++;
+    }
 
-    updatePlayerState(*client_.game_state, input, delta_time_,
-                      client_.player_index);
-    updateGameState(*client_.game_state, delta_time_);
-    client_.saveFrame(input);
-    drawGameState(*client_.game_state, horizontal_resolution_ / arena_width, vertical_resolution_ / arena_height);
+    drawGameState(client_.game_state, horizontal_resolution_ / arena_width, vertical_resolution_ / arena_height);
   }
 };
 
