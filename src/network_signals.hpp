@@ -5,17 +5,51 @@
 #include <stdint.h>
 #include <vector>
 
-constexpr int RR_NO_REQUEST = 0;
-constexpr int RR_LIST_ROOMS = 1;
-constexpr int RR_JOIN_ROOM = 2;
-constexpr int RR_MAKE_ROOM = 3;
+constexpr uint16_t MSG_LOBBY_STATE = 0;
+constexpr uint16_t MSG_ROOM_REQUEST = 1;
+constexpr uint16_t MSG_CLIENT_INPUT = 2;
+constexpr uint16_t MSG_ROOM_STATE = 3;
+constexpr uint16_t MSG_GAME_STATE = 4;
+
+struct MessageTag {
+  uint16_t type;
+
+  template <class Archive> void serialize(Archive &archive) { archive(type); }
+};
+
+constexpr uint16_t RR_NO_REQUEST = 0;
+constexpr uint16_t RR_LIST_ROOMS = 1;
+constexpr uint16_t RR_JOIN_ROOM = 2;
+constexpr uint16_t RR_MAKE_ROOM = 3;
 
 struct RoomRequest {
-  uint64_t command = RR_NO_REQUEST;
+  uint16_t command = RR_NO_REQUEST;
   int desired_room = -1;
 
   template <class Archive> void serialize(Archive &archive) {
     archive(command, desired_room);
+  }
+};
+
+struct LobbyState {
+  std::vector<int> available_rooms;
+
+  template <class Archive> void serialize(Archive &archive) {
+    archive(available_rooms);
+  }
+};
+
+constexpr uint16_t RS_WAITING = 0;
+constexpr uint16_t RS_PLAYING = 1;
+
+struct RoomState {
+  uint16_t state = RS_WAITING;
+  int current_room = -1;
+  int num_connected = 0;
+  int player_index = -1;
+
+  template <class Archive> void serialize(Archive &archive) {
+    archive(state, current_room, num_connected, player_index);
   }
 };
 
@@ -26,40 +60,6 @@ struct InputMessage {
 
   template <class Archive> void serialize(Archive &archive) {
     archive(tick, up, down);
-  }
-};
-
-struct ClientNetworkMessage {
-  RoomRequest room_request;
-  std::vector<InputMessage> inputs;
-
-  template <class Archive> void serialize(Archive &archive) {
-    archive(room_request, inputs);
-  }
-};
-
-constexpr int RS_WAITING = 0;
-constexpr int RS_PLAYING = 1;
-
-struct RoomState {
-  uint16_t state = RS_WAITING;
-  int current_room = -1;
-  int num_connected = 0;
-
-  template <class Archive> void serialize(Archive &archive) {
-    archive(state, current_room, num_connected);
-  }
-};
-
-struct ServerNetworkMessage {
-  std::vector<int> available_rooms; // TODO: change to bit field
-  // which player you are in a room, -1 if not in room
-  int player_number = -1;
-  RoomState room_state;
-  GameState game_state;
-
-  template <class Archive> void serialize(Archive &archive) {
-    archive(available_rooms, player_number, room_state, game_state);
   }
 };
 

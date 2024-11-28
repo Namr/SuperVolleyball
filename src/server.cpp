@@ -2,9 +2,9 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <mutex>
 #include <optional>
-#include <list>
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingsockets.h>
 #include <string>
@@ -28,7 +28,7 @@ public:
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
   std::function<void()> propogate_state_callback;
-  
+
   std::optional<size_t> playerIndexOfConnection(HSteamNetConnection conn) {
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (this->players[i] == conn) {
@@ -62,30 +62,28 @@ private:
   std::list<std::pair<InputMessage, int>>
       message_queue_; // pair (input, player_idx)
   std::thread game_tick_thread_;
-  
-  bool areClientsAhead(std::array<bool, PLAYERS_PER_ROOM>& ready_list) {
+
+  bool areClientsAhead(std::array<bool, PLAYERS_PER_ROOM> &ready_list) {
     {
       std::scoped_lock l(lock);
-      for(const auto& pair : message_queue_) {
-        if(pair.first.tick >= CLIENT_RUNWAY) {
+      for (const auto &pair : message_queue_) {
+        if (pair.first.tick >= CLIENT_RUNWAY) {
           ready_list[pair.second] = true;
         }
       }
     }
 
-    return std::all_of(
-      std::begin(ready_list), 
-      std::end(ready_list), 
-      [](bool i) { return i; });
+    return std::all_of(std::begin(ready_list), std::end(ready_list),
+                       [](bool i) { return i; });
   }
 
   void gameLogicThread() {
     // wait for clients to get ahead before starting the game loop
     std::array<bool, PLAYERS_PER_ROOM> ready; // TODO: bitset
     ready.fill(false);
-    while(!areClientsAhead(ready)) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds((int)(DESIRED_TICK_LENGTH * 1000.0)));
+    while (!areClientsAhead(ready)) {
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds((int)(DESIRED_TICK_LENGTH * 1000.0)));
     }
 
     double delta_time = 0.0;
@@ -93,12 +91,14 @@ private:
     uint32_t tick = 0;
 
     auto frame_start = steady_clock::now();
-    double time_accumulator = DESIRED_TICK_LENGTH; // this forces a tick on the first frame
-    
+    double time_accumulator =
+        DESIRED_TICK_LENGTH; // this forces a tick on the first frame
 
     // game loop
     while (true) {
-      double delta_time = static_cast<duration<double>>(steady_clock::now() - frame_start).count();
+      double delta_time =
+          static_cast<duration<double>>(steady_clock::now() - frame_start)
+              .count();
       frame_start = steady_clock::now();
 
       // lock room state
@@ -112,17 +112,19 @@ private:
         time_accumulator += delta_time;
 
         // move game logic forward in equally sized ticks
-        while(time_accumulator >= DESIRED_TICK_LENGTH) {
+        while (time_accumulator >= DESIRED_TICK_LENGTH) {
           time_accumulator -= DESIRED_TICK_LENGTH;
 
           // consume inputs that correspond to this tick
           auto input_iterator = message_queue_.begin();
-          while(input_iterator != message_queue_.end()) {
-            if(input_iterator->first.tick == tick) {
-              updatePlayerState(game_state, input_iterator->first, DESIRED_TICK_LENGTH, input_iterator->second);
+          while (input_iterator != message_queue_.end()) {
+            if (input_iterator->first.tick == tick) {
+              updatePlayerState(game_state, input_iterator->first,
+                                DESIRED_TICK_LENGTH, input_iterator->second);
               input_iterator = message_queue_.erase(input_iterator);
-            } else if(input_iterator->first.tick < tick) {
-              std::cout << "client is behind!!! " << input_iterator->first.tick << " vs " << tick << std::endl;
+            } else if (input_iterator->first.tick < tick) {
+              std::cout << "client is behind!!! " << input_iterator->first.tick
+                        << " vs " << tick << std::endl;
               input_iterator = message_queue_.erase(input_iterator);
             } else {
               input_iterator++;
@@ -158,7 +160,8 @@ public:
     // init rooms
     for (int i = 0; i < MAX_ROOMS; i++) {
       rooms_[i].room_state.current_room = i;
-      rooms_[i].propogate_state_callback = std::bind(&Server::propogateRoomState, this, i);
+      rooms_[i].propogate_state_callback =
+          std::bind(&Server::propogateGameState, this, i);
     }
 
     // init connection lib
@@ -245,39 +248,41 @@ private:
       if (connected_clients_.find(incoming_msg->m_conn) !=
           connected_clients_.end()) {
         // deserialize the client request
-        ClientNetworkMessage msg;
-        {
-          std::stringstream ss(std::ios::binary | std::ios_base::app |
-                               std::ios_base::in | std::ios_base::out);
-          ss.write((char const *)incoming_msg->m_pData, incoming_msg->m_cbSize);
-          cereal::BinaryInputArchive dearchive(ss);
-          dearchive(msg);
-        }
+        MessageTag msg_tag;
+        std::stringstream ss(std::ios::binary | std::ios_base::app |
+                             std::ios_base::in | std::ios_base::out);
+        ss.write((char const *)incoming_msg->m_pData, incoming_msg->m_cbSize);
+        cereal::BinaryInputArchive dearchive(ss);
+        dearchive(msg_tag);
+        if (msg_tag.type == MSG_ROOM_REQUEST) {
+          RoomRequest room_request_msg;
+          dearchive(room_request_msg);
 
-        // if not in room, respond to room requests
-        if (connected_clients_[incoming_msg->m_conn] == -1) {
-          ServerNetworkMessage response;
-          if (msg.room_request.command == RR_LIST_ROOMS) {
+          if (room_request_msg.command == RR_LIST_ROOMS) {
+            LobbyState response;
             for (int i = 0; i < MAX_ROOMS; i++) {
               if (rooms_[i].room_state.num_connected > 0) {
                 response.available_rooms.push_back(i);
               }
             }
-            sendRequest(response, incoming_msg->m_conn);
-          } else if (msg.room_request.command == RR_JOIN_ROOM) {
+            sendLobbyState(response, incoming_msg->m_conn);
+          } else if (room_request_msg.command == RR_JOIN_ROOM) {
             if (!joinRoom(incoming_msg->m_conn,
-                          msg.room_request.desired_room)) {
+                          room_request_msg.desired_room)) {
               // send error
               std::cout << "error joining a room\n";
             }
-          } else if (msg.room_request.command == RR_MAKE_ROOM) {
+          } else if (room_request_msg.command == RR_MAKE_ROOM) {
             int room_id = makeRoom(incoming_msg->m_conn);
             if (room_id == -1) {
               // send error
               std::cout << "error making a room\n";
             }
           }
-        } else {
+        } else if (msg_tag.type == MSG_CLIENT_INPUT) {
+          InputMessage input_msg;
+          dearchive(input_msg);
+
           int room_id = connected_clients_[incoming_msg->m_conn];
           Room &room = rooms_[room_id];
           std::optional<size_t> maybe_player_index =
@@ -290,10 +295,7 @@ private:
             // do nothing
           } else {
             // if not, feed player inputs
-            for (const InputMessage &i : msg.inputs) {
-              room.feedInput(i, player_index);
-            }
-            // propogateRoomState(room_id);
+            room.feedInput(input_msg, player_index);
           }
         }
       }
@@ -357,17 +359,52 @@ private:
     }
   }
 
-  void sendRequest(ServerNetworkMessage &msg, HSteamNetConnection connection) {
+  void sendLobbyState(LobbyState &lobby_state, HSteamNetConnection connection) {
+    MessageTag msg_tag;
+    msg_tag.type = MSG_LOBBY_STATE;
     std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
                                        std::ios_base::in | std::ios_base::out);
     {
       cereal::BinaryOutputArchive archive(response_stream);
-      archive(msg);
+      archive(msg_tag);
+      archive(lobby_state);
     }
     std::string tmp_str = response_stream.str();
     network_interface_->SendMessageToConnection(
         connection, tmp_str.c_str(), tmp_str.size(),
         k_nSteamNetworkingSend_Reliable, nullptr);
+  }
+
+  void sendRoomState(RoomState &room_state, HSteamNetConnection connection) {
+    MessageTag msg_tag;
+    msg_tag.type = MSG_ROOM_STATE;
+    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
+                                       std::ios_base::in | std::ios_base::out);
+    {
+      cereal::BinaryOutputArchive archive(response_stream);
+      archive(msg_tag);
+      archive(room_state);
+    }
+    std::string tmp_str = response_stream.str();
+    network_interface_->SendMessageToConnection(
+        connection, tmp_str.c_str(), tmp_str.size(),
+        k_nSteamNetworkingSend_Reliable, nullptr);
+  }
+
+  void sendGameState(GameState &game_state, HSteamNetConnection connection) {
+    MessageTag msg_tag;
+    msg_tag.type = MSG_GAME_STATE;
+    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
+                                       std::ios_base::in | std::ios_base::out);
+    {
+      cereal::BinaryOutputArchive archive(response_stream);
+      archive(msg_tag);
+      archive(game_state);
+    }
+    std::string tmp_str = response_stream.str();
+    network_interface_->SendMessageToConnection(
+        connection, tmp_str.c_str(), tmp_str.size(),
+        k_nSteamNetworkingSend_Unreliable, nullptr);
   }
 
   bool joinRoom(HSteamNetConnection player, int room_id) {
@@ -426,17 +463,30 @@ private:
   }
 
   void propogateRoomState(int room_id) {
-    ServerNetworkMessage msg;
+    RoomState msg;
     {
       std::scoped_lock lock(rooms_[room_id].lock);
-      msg.room_state = rooms_[room_id].room_state;
-      msg.game_state = rooms_[room_id].game_state;
+      msg = rooms_[room_id].room_state;
     }
 
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (rooms_[room_id].players[i]) {
-        msg.player_number = i;
-        sendRequest(msg, rooms_[room_id].players[i].value());
+        msg.player_index = i;
+        sendRoomState(msg, rooms_[room_id].players[i].value());
+      }
+    }
+  }
+
+  void propogateGameState(int room_id) {
+    GameState msg;
+    {
+      std::scoped_lock lock(rooms_[room_id].lock);
+      msg = rooms_[room_id].game_state;
+    }
+
+    for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+      if (rooms_[room_id].players[i]) {
+        sendGameState(msg, rooms_[room_id].players[i].value());
       }
     }
   }

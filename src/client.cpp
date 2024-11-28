@@ -72,69 +72,79 @@ public:
       }
 
       // deserialize the server request
-      ServerNetworkMessage msg;
-      {
-        std::stringstream ss(std::ios::binary | std::ios_base::app |
-                             std::ios_base::in | std::ios_base::out);
-        ss.write((char const *)incoming_msg->m_pData, incoming_msg->m_cbSize);
-        cereal::BinaryInputArchive dearchive(ss);
-        dearchive(msg);
-      }
-      
-      // detect match start to reset game state
-      if(msg.room_state.state == RS_PLAYING && room_state->state != msg.room_state.state) {
-        resetGameState(game_state);
-      }
-      room_state = msg.room_state;
-      // find the time in our history buffer where this recvd state was computed
-      // from if that state does not match what we recvd, we force update it and
-      // then recompute using future inputs the server presumably has not
-      // consumed yet
-      if (room_state->state == RS_PLAYING) {
-        bool is_recomputing = false;
-        bool found_id = false;
-        GameState running_gamestate;
-        for (std::pair<InputMessage, GameState> &p : input_history) {
-          if (is_recomputing) {
-            updatePlayerState(running_gamestate, p.first, DESIRED_TICK_LENGTH,
-                              player_index);
-            updateGameState(running_gamestate, DESIRED_TICK_LENGTH);
-            running_gamestate.tick = p.first.tick;
-            p.second = running_gamestate;
-          } else {
-            // find the timestamp where this recv'd state was computed from
-            if (msg.game_state.tick == p.first.tick) {
-              found_id = true;
-              if (msg.game_state != p.second) {
-                std::cout << "disagreement on tick: " << msg.game_state.tick;
-                std::cout << " ( " << msg.game_state.ball.pos.x << ", " << msg.game_state.ball.pos.y << ") vs ";
-                std::cout << " ( " << p.second.ball.pos.x << ", " << p.second.ball.pos.y << ")\n";
-                is_recomputing = true;
-                p.second = msg.game_state;
-                running_gamestate = msg.game_state;
-                running_gamestate.tick = p.first.tick;
-              } else {
-                break;
+      MessageTag msg_tag;
+      std::stringstream ss(std::ios::binary | std::ios_base::app |
+                           std::ios_base::in | std::ios_base::out);
+      ss.write((char const *)incoming_msg->m_pData, incoming_msg->m_cbSize);
+      cereal::BinaryInputArchive dearchive(ss);
+      dearchive(msg_tag);
+      if (msg_tag.type == MSG_LOBBY_STATE) {
+        LobbyState lobby_state_msg;
+        dearchive(lobby_state_msg);
+        rooms = std::move(lobby_state_msg.available_rooms);
+      } else if (msg_tag.type == MSG_ROOM_STATE) {
+        RoomState room_state_msg;
+        dearchive(room_state_msg);
+
+        // detect match start to reset game state
+        if (room_state_msg.state == RS_PLAYING &&
+            room_state->state != room_state_msg.state) {
+          resetGameState(game_state);
+        }
+
+        room_state = room_state_msg;
+      } else if (msg_tag.type == MSG_GAME_STATE) {
+        GameState game_state_msg;
+        dearchive(game_state_msg);
+        // find the time in our history buffer where this recvd state was
+        // computed from if that state does not match what we recvd, we force
+        // update it and then recompute using future inputs the server
+        // presumably has not consumed yet
+        if (room_state->state == RS_PLAYING) {
+          bool is_recomputing = false;
+          bool found_id = false;
+          GameState running_gamestate;
+          for (std::pair<InputMessage, GameState> &p : input_history) {
+            if (is_recomputing) {
+              updatePlayerState(running_gamestate, p.first, DESIRED_TICK_LENGTH,
+                                room_state->player_index);
+              updateGameState(running_gamestate, DESIRED_TICK_LENGTH);
+              running_gamestate.tick = p.first.tick;
+              p.second = running_gamestate;
+            } else {
+              // find the timestamp where this recv'd state was computed from
+              if (game_state_msg.tick == p.first.tick) {
+                found_id = true;
+                if (game_state_msg != p.second) {
+                  std::cout << "disagreement on tick: " << game_state_msg.tick;
+                  std::cout << " ( " << game_state_msg.ball.pos.x << ", "
+                            << game_state_msg.ball.pos.y << ") vs ";
+                  std::cout << " ( " << p.second.ball.pos.x << ", "
+                            << p.second.ball.pos.y << ")\n";
+                  is_recomputing = true;
+                  p.second = game_state_msg;
+                  running_gamestate = game_state_msg;
+                  running_gamestate.tick = p.first.tick;
+                } else {
+                  break;
+                }
               }
             }
           }
-        }
 
-        // if we had to recompute, update the master gamestate as well
-        if (is_recomputing) {
-          game_state = input_history.back().second;
-        }
-        
-        // if we outran our buffer ...?
-        // FIXME: this can lead to a desync lol
-        if (!found_id) {
-        }
-      }
+          // if we had to recompute, update the master gamestate as well
+          if (is_recomputing) {
+            game_state = input_history.back().second;
+          }
 
-      player_index = msg.player_number != -1 ? msg.player_number : player_index;
-
-      if (!msg.available_rooms.empty()) {
-        rooms = std::move(msg.available_rooms);
+          // if we outran our buffer ...?
+          // FIXME: this can lead to a desync lol
+          if (!found_id) {
+          }
+        }
+      } else {
+        std::cout << "WARN: we got an unexpected message type from the server: "
+                  << msg_tag.type << std::endl;
       }
 
       incoming_msg->Release();
@@ -147,22 +157,22 @@ public:
   }
 
   void updateRoomList() {
-    ClientNetworkMessage msg;
-    msg.room_request.command = RR_LIST_ROOMS;
-    sendRequest(msg);
+    RoomRequest msg;
+    msg.command = RR_LIST_ROOMS;
+    sendRoomRequest(msg);
   }
 
   void joinRoom(uint16_t desired_room) {
-    ClientNetworkMessage msg;
-    msg.room_request.command = RR_JOIN_ROOM;
-    msg.room_request.desired_room = desired_room;
-    sendRequest(msg);
+    RoomRequest msg;
+    msg.command = RR_JOIN_ROOM;
+    msg.desired_room = desired_room;
+    sendRoomRequest(msg);
   }
 
   void makeRoom() {
-    ClientNetworkMessage msg;
-    msg.room_request.command = RR_MAKE_ROOM;
-    sendRequest(msg);
+    RoomRequest msg;
+    msg.command = RR_MAKE_ROOM;
+    sendRoomRequest(msg);
   }
 
   void saveFrame(InputMessage input) {
@@ -173,31 +183,14 @@ public:
   }
 
   void sendInput(const InputMessage &input) {
-    ClientNetworkMessage msg;
-    msg.room_request.command = RR_NO_REQUEST;
-    msg.inputs.push_back(input);
-    sendRequestUnreliably(msg);
-  }
-
-  void sendRequest(ClientNetworkMessage &msg) {
+    MessageTag msg_tag;
+    msg_tag.type = MSG_CLIENT_INPUT;
     std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
                                        std::ios_base::in | std::ios_base::out);
     {
       cereal::BinaryOutputArchive archive(response_stream);
-      archive(msg);
-    }
-    std::string tmp_str = response_stream.str();
-    network_interface_->SendMessageToConnection(
-        connection_, tmp_str.c_str(), tmp_str.size(),
-        k_nSteamNetworkingSend_Reliable, nullptr);
-  }
-
-  void sendRequestUnreliably(ClientNetworkMessage &msg) {
-    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
-                                       std::ios_base::in | std::ios_base::out);
-    {
-      cereal::BinaryOutputArchive archive(response_stream);
-      archive(msg);
+      archive(msg_tag);
+      archive(input);
     }
     std::string tmp_str = response_stream.str();
     network_interface_->SendMessageToConnection(
@@ -205,8 +198,23 @@ public:
         k_nSteamNetworkingSend_Unreliable, nullptr);
   }
 
+  void sendRoomRequest(RoomRequest &room_request) {
+    MessageTag msg_tag;
+    msg_tag.type = MSG_ROOM_REQUEST;
+    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
+                                       std::ios_base::in | std::ios_base::out);
+    {
+      cereal::BinaryOutputArchive archive(response_stream);
+      archive(msg_tag);
+      archive(room_request);
+    }
+    std::string tmp_str = response_stream.str();
+    network_interface_->SendMessageToConnection(
+        connection_, tmp_str.c_str(), tmp_str.size(),
+        k_nSteamNetworkingSend_Reliable, nullptr);
+  }
+
   std::vector<int> rooms;
-  int player_index = -1;
   bool connected = false;
   std::optional<RoomState> room_state;
   GameState game_state;
@@ -262,14 +270,19 @@ InputMessage getInput(uint32_t tick) {
 
 void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // game pieces
-  DrawRectangle((int)state.p1_paddle.pos.x * w_ratio, (int)state.p1_paddle.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio, WHITE);
-  DrawRectangle((int)state.p2_paddle.pos.x * w_ratio, (int)state.p2_paddle.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio, WHITE);
+  DrawRectangle((int)state.p1_paddle.pos.x * w_ratio,
+                (int)state.p1_paddle.pos.y * h_ratio,
+                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
+                WHITE);
+  DrawRectangle((int)state.p2_paddle.pos.x * w_ratio,
+                (int)state.p2_paddle.pos.y * h_ratio,
+                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
+                WHITE);
 
   DrawRectangle((int)(state.ball.pos.x - ball_radius) * w_ratio,
-                (int)(state.ball.pos.y - ball_radius) * h_ratio, (int)ball_radius * 2 * w_ratio,
-                (int)ball_radius * 2 * h_ratio, WHITE);
+                (int)(state.ball.pos.y - ball_radius) * h_ratio,
+                (int)ball_radius * 2 * w_ratio, (int)ball_radius * 2 * h_ratio,
+                WHITE);
 
   // divider lines
   constexpr int num_lines = 6;
@@ -279,8 +292,8 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   const int rect_height = rect_spacing - space_between_divider;
   for (int i = 0; i < num_lines; i++) {
     DrawRectangle((int)(arena_width / 2.0) * w_ratio,
-                  (rect_spacing * i + (space_between_divider / 2.0)), rect_width,
-                  (rect_height), WHITE);
+                  (rect_spacing * i + (space_between_divider / 2.0)),
+                  rect_width, (rect_height), WHITE);
   }
 
   // score
@@ -289,8 +302,10 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   snprintf(p1_score, 20, "%d", state.p1_score);
   snprintf(p2_score, 20, "%d", state.p2_score);
 
-  DrawText(p1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio, WHITE);
-  DrawText(p2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio, WHITE);
+  DrawText(p1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio,
+           WHITE);
+  DrawText(p2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio,
+           80 * h_ratio, WHITE);
 }
 
 class Game {
@@ -301,7 +316,7 @@ public:
   void start() {
     client_.start();
     InitWindow(horizontal_resolution_, vertical_resolution_, "SuperVolleyball");
-    SetTargetFPS(120);
+    SetTargetFPS(60);
     SetExitKey(0);
     client_.updateRoomList();
   }
@@ -360,7 +375,7 @@ private:
   int scene_ = SCENE_MAIN_MENU;
   int horizontal_resolution_ = 800;
   int vertical_resolution_ = 450;
-  double w_ratio_ =  horizontal_resolution_ / arena_width;
+  double w_ratio_ = horizontal_resolution_ / arena_width;
   double h_ratio_ = vertical_resolution_ / arena_height;
 
   void handle_menu_movement(size_t max_selection_value) {
@@ -374,26 +389,33 @@ private:
   }
 
   void main_menu() {
-    DrawTextCentered("Welcome to SuperVolleyball!", 400 * w_ratio_, 120 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+    DrawTextCentered("Welcome to SuperVolleyball!", 400 * w_ratio_,
+                     120 * h_ratio_, 20 * h_ratio_, RAYWHITE);
 
     if (client_.connected) {
       if (selection_ == 0) {
-        DrawTextCentered("< Play >", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+        DrawTextCentered("< Play >", 400 * w_ratio_, 160 * h_ratio_,
+                         20 * h_ratio_, RAYWHITE);
       } else {
-        DrawTextCentered("Play", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+        DrawTextCentered("Play", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_,
+                         RAYWHITE);
       }
     } else {
       if (selection_ == 0) {
-        DrawTextCentered("< Connecting to server... >", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+        DrawTextCentered("< Connecting to server... >", 400 * w_ratio_,
+                         160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
       } else {
-        DrawTextCentered("Connecting to server...", 400 * w_ratio_, 160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+        DrawTextCentered("Connecting to server...", 400 * w_ratio_,
+                         160 * h_ratio_, 20 * h_ratio_, RAYWHITE);
       }
     }
 
     if (selection_ == 1) {
-      DrawTextCentered("< Settings >", 400 * w_ratio_, 200 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+      DrawTextCentered("< Settings >", 400 * w_ratio_, 200 * h_ratio_,
+                       20 * h_ratio_, RAYWHITE);
     } else {
-      DrawTextCentered("Settings", 400 * w_ratio_, 200 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+      DrawTextCentered("Settings", 400 * w_ratio_, 200 * h_ratio_,
+                       20 * h_ratio_, RAYWHITE);
     }
 
     if (IsKeyReleased(KEY_ENTER)) {
@@ -413,7 +435,8 @@ private:
     std::string resolution = "Resolution: < " +
                              std::to_string(horizontal_resolution_) + " x " +
                              std::to_string(vertical_resolution_) + " >";
-    DrawTextCentered(resolution.c_str(), 400 * w_ratio_, 120 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+    DrawTextCentered(resolution.c_str(), 400 * w_ratio_, 120 * h_ratio_,
+                     20 * h_ratio_, RAYWHITE);
 
     if (IsKeyReleased(KEY_ESCAPE)) {
       scene_ = SCENE_MAIN_MENU;
@@ -426,7 +449,7 @@ private:
 
     horizontal_resolution_ = AVAILABLE_RESOLUTIONS[selection_].first;
     vertical_resolution_ = AVAILABLE_RESOLUTIONS[selection_].second;
-    w_ratio_ =  horizontal_resolution_ / arena_width;
+    w_ratio_ = horizontal_resolution_ / arena_width;
     h_ratio_ = vertical_resolution_ / arena_height;
 
     if (old_horiz != horizontal_resolution_ ||
@@ -439,17 +462,20 @@ private:
 
   void room_selection() {
     DrawTextCentered(
-        "Press R to refresh room list or press C to make a new room", 400 * w_ratio_, 20 * h_ratio_, 20 * h_ratio_, RAYWHITE);
-    DrawTextCentered("Rooms:", 400 * w_ratio_, 40 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+        "Press R to refresh room list or press C to make a new room",
+        400 * w_ratio_, 20 * h_ratio_, 20 * h_ratio_, RAYWHITE);
+    DrawTextCentered("Rooms:", 400 * w_ratio_, 40 * h_ratio_, 20 * h_ratio_,
+                     RAYWHITE);
 
     int line_start = 60;
     for (int i = 0; i < client_.rooms.size(); i++) {
       if (i == selection_) {
         std::string text = "< " + std::to_string(client_.rooms[i]) + " >";
-        DrawText(text.c_str(), 400 * w_ratio_, line_start * h_ratio_, 20 * h_ratio_, RAYWHITE);
+        DrawText(text.c_str(), 400 * w_ratio_, line_start * h_ratio_,
+                 20 * h_ratio_, RAYWHITE);
       } else {
-        DrawText(std::to_string(client_.rooms[i]).c_str(), 400 * w_ratio_, line_start * h_ratio_, 20 * h_ratio_,
-                 RAYWHITE);
+        DrawText(std::to_string(client_.rooms[i]).c_str(), 400 * w_ratio_,
+                 line_start * h_ratio_, 20 * h_ratio_, RAYWHITE);
       }
       line_start += 20;
     }
@@ -470,29 +496,32 @@ private:
     std::string room_members =
         "there are " + std::to_string(client_.room_state->num_connected) +
         " players here";
-    DrawTextCentered(room_id.c_str(), 400 * w_ratio_, 100 * h_ratio_, 20 * h_ratio_, LIGHTGRAY);
-    DrawTextCentered(room_members.c_str(), 400 * w_ratio_, 120 * h_ratio_, 20 * h_ratio_, LIGHTGRAY);
+    DrawTextCentered(room_id.c_str(), 400 * w_ratio_, 100 * h_ratio_,
+                     20 * h_ratio_, LIGHTGRAY);
+    DrawTextCentered(room_members.c_str(), 400 * w_ratio_, 120 * h_ratio_,
+                     20 * h_ratio_, LIGHTGRAY);
   }
 
   void play_game() {
     time_accumulator_ += delta_time_;
-    while(time_accumulator_ >= DESIRED_TICK_LENGTH) {
+    while (time_accumulator_ >= DESIRED_TICK_LENGTH) {
       time_accumulator_ -= DESIRED_TICK_LENGTH;
-      
+
       // input handling
       InputMessage input = getInput(tick_);
       client_.sendInput(input);
-      
+
       // game update
       updatePlayerState(client_.game_state, input, DESIRED_TICK_LENGTH,
-                        client_.player_index);
+                        client_.room_state->player_index);
       updateGameState(client_.game_state, DESIRED_TICK_LENGTH);
       client_.game_state.tick = tick_;
       client_.saveFrame(input);
       tick_++;
     }
 
-    drawGameState(client_.game_state, horizontal_resolution_ / arena_width, vertical_resolution_ / arena_height);
+    drawGameState(client_.game_state, horizontal_resolution_ / arena_width,
+                  vertical_resolution_ / arena_height);
   }
 };
 

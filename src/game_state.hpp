@@ -19,9 +19,7 @@ constexpr float ball_speed_inc = 50.0;
 constexpr float max_bounce_angle = 35.0;
 
 constexpr double EPSILON = 0.8;
-inline bool fcmp(float a, float b) {
-  return std::abs(a - b ) < EPSILON;
-}
+inline bool fcmp(float a, float b) { return std::abs(a - b) < EPSILON; }
 
 struct Vec2 {
   float x = 0.0;
@@ -29,9 +27,7 @@ struct Vec2 {
 
   template <class Archive> void serialize(Archive &archive) { archive(x, y); }
 
-  bool operator==(const Vec2 &c) {
-    return fcmp(x, c.x) && fcmp(y, c.y);
-  }
+  bool operator==(const Vec2 &c) { return fcmp(x, c.x) && fcmp(y, c.y); }
 
   Vec2 operator+(const Vec2 &c) {
     Vec2 ret;
