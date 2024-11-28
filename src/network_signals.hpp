@@ -1,6 +1,8 @@
 #pragma once
 #include "game_state.hpp"
 #include <cereal/archives/binary.hpp>
+#include <cereal/types/array.hpp>
+#include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
 #include <stdint.h>
 #include <vector>
@@ -25,9 +27,10 @@ constexpr uint16_t RR_MAKE_ROOM = 3;
 struct RoomRequest {
   uint16_t command = RR_NO_REQUEST;
   int desired_room = -1;
+  std::string nickname;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(command, desired_room);
+    archive(command, desired_room, nickname);
   }
 };
 
@@ -47,9 +50,10 @@ struct RoomState {
   int current_room = -1;
   int num_connected = 0;
   int player_index = -1;
+  std::array<std::string, PLAYERS_PER_ROOM> nicknames;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(state, current_room, num_connected, player_index);
+    archive(state, current_room, num_connected, player_index, nicknames);
   }
 };
 

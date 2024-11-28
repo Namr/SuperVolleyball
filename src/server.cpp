@@ -267,13 +267,14 @@ private:
             }
             sendLobbyState(response, incoming_msg->m_conn);
           } else if (room_request_msg.command == RR_JOIN_ROOM) {
-            if (!joinRoom(incoming_msg->m_conn,
-                          room_request_msg.desired_room)) {
+            if (!joinRoom(incoming_msg->m_conn, room_request_msg.desired_room,
+                          room_request_msg.nickname)) {
               // send error
               std::cout << "error joining a room\n";
             }
           } else if (room_request_msg.command == RR_MAKE_ROOM) {
-            int room_id = makeRoom(incoming_msg->m_conn);
+            int room_id =
+                makeRoom(incoming_msg->m_conn, room_request_msg.nickname);
             if (room_id == -1) {
               // send error
               std::cout << "error making a room\n";
@@ -407,7 +408,8 @@ private:
         k_nSteamNetworkingSend_Unreliable, nullptr);
   }
 
-  bool joinRoom(HSteamNetConnection player, int room_id) {
+  bool joinRoom(HSteamNetConnection player, int room_id,
+                const std::string &nickname) {
     Room &room = rooms_[room_id];
     if (room.room_state.num_connected >= PLAYERS_PER_ROOM) {
       return false;
@@ -424,6 +426,7 @@ private:
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (!room.players[i].has_value()) {
         room.players[i] = player;
+        room.room_state.nicknames[i] = nickname;
         break;
       }
     }
@@ -431,11 +434,11 @@ private:
     return true;
   }
 
-  int makeRoom(HSteamNetConnection player) {
+  int makeRoom(HSteamNetConnection player, const std::string &nickname) {
     // find first empty room slot and join it
     for (int i = 0; i < MAX_ROOMS; i++) {
       if (rooms_[i].room_state.num_connected == 0 &&
-          joinRoom(player, i) == true) {
+          joinRoom(player, i, nickname) == true) {
         propogateRoomState(i);
         return i;
       }

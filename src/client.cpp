@@ -19,6 +19,9 @@ constexpr size_t INPUT_HISTORY_CAPACITY = 30;
 constexpr int SCENE_MAIN_MENU = 0;
 constexpr int SCENE_ROOM_SELECT = 1;
 constexpr int SCENE_SETTINGS = 2;
+constexpr int SCENE_SET_NAME = 3;
+constexpr uint16_t NICKNAME_MAX_LENGTH = 6;
+
 constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
     std::make_pair(800, 450), std::make_pair(1280, 820),
     std::make_pair(1920, 1080), std::make_pair(2560, 1440)};
@@ -166,12 +169,14 @@ public:
     RoomRequest msg;
     msg.command = RR_JOIN_ROOM;
     msg.desired_room = desired_room;
+    msg.nickname = nickname;
     sendRoomRequest(msg);
   }
 
   void makeRoom() {
     RoomRequest msg;
     msg.command = RR_MAKE_ROOM;
+    msg.nickname = nickname;
     sendRoomRequest(msg);
   }
 
@@ -218,6 +223,7 @@ public:
   bool connected = false;
   std::optional<RoomState> room_state;
   GameState game_state;
+  std::string nickname; // FIXME why are there two of these... this is dumb
   std::deque<std::pair<InputMessage, GameState>> input_history;
 
 private:
@@ -308,6 +314,13 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
            80 * h_ratio, WHITE);
 }
 
+void drawRoomState(const RoomState &state, double w_ratio, double h_ratio) {
+  DrawTextCentered(state.nicknames[0], (arena_width / 20) * w_ratio,
+                   20 * h_ratio, 10 * h_ratio, WHITE);
+  DrawTextCentered(state.nicknames[1], 19 * (arena_width / 20) * w_ratio,
+                   20 * h_ratio, 10 * h_ratio, WHITE);
+}
+
 class Game {
 public:
   Game() = default;
@@ -341,6 +354,9 @@ public:
         case SCENE_MAIN_MENU:
           main_menu();
           break;
+        case SCENE_SET_NAME:
+          set_name();
+          break;
         case SCENE_SETTINGS:
           settings();
           break;
@@ -367,6 +383,7 @@ public:
 private:
   Client client_;
   size_t selection_ = 0;
+  std::string nickname_;
 
   uint32_t tick_ = 0;
   double delta_time_ = 0.0;
@@ -420,7 +437,7 @@ private:
 
     if (IsKeyReleased(KEY_ENTER)) {
       if (selection_ == 0 && client_.connected) {
-        scene_ = SCENE_ROOM_SELECT;
+        scene_ = SCENE_SET_NAME;
         selection_ = 0;
       } else if (selection_ == 1) {
         scene_ = SCENE_SETTINGS;
@@ -490,6 +507,33 @@ private:
     handle_menu_movement(client_.rooms.size() - 1);
   }
 
+  void set_name() {
+    DrawTextCentered("Enter a username", 400 * w_ratio_, 120 * h_ratio_,
+                     20 * h_ratio_, RAYWHITE);
+    DrawTextCentered("Press enter to confirm", 400 * w_ratio_, 140 * h_ratio_,
+                     20 * h_ratio_, RAYWHITE);
+
+    // capture input
+    char c;
+    while ((c = GetCharPressed()) != 0 &&
+           nickname_.length() < NICKNAME_MAX_LENGTH) {
+      nickname_.push_back(c);
+    }
+    if (IsKeyReleased(KEY_BACKSPACE) && !nickname_.empty()) {
+      nickname_.pop_back();
+    }
+
+    // print str
+    DrawTextCentered(nickname_.c_str(), 400 * w_ratio_, 160 * h_ratio_,
+                     20 * h_ratio_, RAYWHITE);
+
+    if (IsKeyReleased(KEY_ENTER)) {
+      scene_ = SCENE_ROOM_SELECT;
+      selection_ = 0;
+      client_.nickname = nickname_;
+    }
+  }
+
   void wait_for_match_start() {
     std::string room_id =
         "you are in room: " + std::to_string(client_.room_state->current_room);
@@ -521,6 +565,8 @@ private:
     }
 
     drawGameState(client_.game_state, horizontal_resolution_ / arena_width,
+                  vertical_resolution_ / arena_height);
+    drawRoomState(*client_.room_state, horizontal_resolution_ / arena_width,
                   vertical_resolution_ / arena_height);
   }
 };
