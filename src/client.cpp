@@ -96,6 +96,11 @@ public:
         }
 
         room_state = room_state_msg;
+      } else if (msg_tag.type == MSG_PING) {
+        // just send it right back
+        PingMessage ping_msg;
+        dearchive(ping_msg);
+        sendPing(ping_msg);
       } else if (msg_tag.type == MSG_GAME_STATE) {
         GameState game_state_msg;
         dearchive(game_state_msg);
@@ -201,6 +206,22 @@ public:
     network_interface_->SendMessageToConnection(
         connection_, tmp_str.c_str(), tmp_str.size(),
         k_nSteamNetworkingSend_Unreliable, nullptr);
+  }
+
+  void sendPing(const PingMessage &ping) {
+    MessageTag msg_tag;
+    msg_tag.type = MSG_PING;
+    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
+                                       std::ios_base::in | std::ios_base::out);
+    {
+      cereal::BinaryOutputArchive archive(response_stream);
+      archive(msg_tag);
+      archive(ping);
+    }
+    std::string tmp_str = response_stream.str();
+    network_interface_->SendMessageToConnection(
+        connection_, tmp_str.c_str(), tmp_str.size(),
+        k_nSteamNetworkingSend_Reliable, nullptr);
   }
 
   void sendRoomRequest(RoomRequest &room_request) {
@@ -315,10 +336,15 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
 }
 
 void drawRoomState(const RoomState &state, double w_ratio, double h_ratio) {
-  DrawTextCentered(state.nicknames[0], (arena_width / 20) * w_ratio,
-                   20 * h_ratio, 10 * h_ratio, WHITE);
-  DrawTextCentered(state.nicknames[1], 19 * (arena_width / 20) * w_ratio,
-                   20 * h_ratio, 10 * h_ratio, WHITE);
+  char p1[40];
+  char p2[40];
+  snprintf(p1, 20, "%s %d ms", state.nicknames[0].c_str(), state.pings[0]);
+  snprintf(p2, 20, "%s %d ms", state.nicknames[1].c_str(), state.pings[1]);
+
+  DrawTextCentered(p1, (arena_width / 20) * w_ratio, 20 * h_ratio, 10 * h_ratio,
+                   WHITE);
+  DrawTextCentered(p2, 19 * (arena_width / 20) * w_ratio, 20 * h_ratio,
+                   10 * h_ratio, WHITE);
 }
 
 class Game {

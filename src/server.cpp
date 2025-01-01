@@ -15,8 +15,11 @@
 #include "game_state.hpp"
 
 using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
 using std::chrono::seconds;
 using std::chrono::steady_clock;
+using std::chrono::system_clock;
 
 constexpr uint16_t PORT = 25565;
 constexpr uint32_t CLIENT_RUNWAY = 6;
@@ -28,6 +31,7 @@ public:
   GameState game_state;
   std::array<std::optional<HSteamNetConnection>, PLAYERS_PER_ROOM> players;
   std::function<void()> propogate_state_callback;
+  uint32_t should_ping_counter = 0;
 
   std::optional<size_t> playerIndexOfConnection(HSteamNetConnection conn) {
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
@@ -298,6 +302,28 @@ private:
             // if not, feed player inputs
             room.feedInput(input_msg, player_index);
           }
+        } else if (msg_tag.type == MSG_PING) {
+          // get current time
+          uint32_t current_time = duration_cast<milliseconds>(
+                                      system_clock::now().time_since_epoch())
+                                      .count();
+          PingMessage ping_msg;
+          dearchive(ping_msg);
+
+          // compute round trip in ms
+          uint32_t ping = current_time - ping_msg.server_send_time;
+
+          // store it in the room
+          int room_id = connected_clients_[incoming_msg->m_conn];
+          Room &room = rooms_[room_id];
+          std::optional<size_t> maybe_player_index =
+              room.playerIndexOfConnection(incoming_msg->m_conn);
+          if (!maybe_player_index.has_value()) {
+            continue;
+          }
+          size_t player_index = maybe_player_index.value();
+          room.room_state.pings[player_index] = ping;
+          propogateRoomState(room_id);
         }
       }
       incoming_msg->Release();
@@ -385,6 +411,26 @@ private:
       cereal::BinaryOutputArchive archive(response_stream);
       archive(msg_tag);
       archive(room_state);
+    }
+    std::string tmp_str = response_stream.str();
+    network_interface_->SendMessageToConnection(
+        connection, tmp_str.c_str(), tmp_str.size(),
+        k_nSteamNetworkingSend_Reliable, nullptr);
+  }
+
+  void sendPing(HSteamNetConnection connection) {
+    MessageTag msg_tag;
+    PingMessage msg;
+    msg.server_send_time =
+        duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+            .count();
+    msg_tag.type = MSG_PING;
+    std::ostringstream response_stream(std::ios::binary | std::ios_base::app |
+                                       std::ios_base::in | std::ios_base::out);
+    {
+      cereal::BinaryOutputArchive archive(response_stream);
+      archive(msg_tag);
+      archive(msg);
     }
     std::string tmp_str = response_stream.str();
     network_interface_->SendMessageToConnection(
@@ -482,14 +528,21 @@ private:
 
   void propogateGameState(int room_id) {
     GameState msg;
+    bool should_ping = false;
     {
       std::scoped_lock lock(rooms_[room_id].lock);
       msg = rooms_[room_id].game_state;
+      should_ping = rooms_[room_id].should_ping_counter++ %
+                        static_cast<uint32_t>(TICK_RATE * 2) ==
+                    0;
     }
 
     for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
       if (rooms_[room_id].players[i]) {
         sendGameState(msg, rooms_[room_id].players[i].value());
+        if (should_ping) {
+          sendPing(rooms_[room_id].players[i].value());
+        }
       }
     }
   }
