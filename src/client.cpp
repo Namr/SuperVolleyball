@@ -531,7 +531,7 @@ private:
       client_.makeRoom();
     } else if (IsKeyReleased(KEY_R)) {
       client_.updateRoomList();
-    } else if (IsKeyReleased(KEY_ENTER)) {
+    } else if (IsKeyReleased(KEY_ENTER) && !client_.rooms.empty()) {
       client_.joinRoom(client_.rooms[selection_]);
     }
     handle_menu_movement(client_.rooms.size() - 1);
@@ -557,7 +557,7 @@ private:
     DrawTextCentered(nickname_.c_str(), 400 * w_ratio_, 160 * h_ratio_,
                      20 * h_ratio_, RAYWHITE);
 
-    if (IsKeyReleased(KEY_ENTER)) {
+    if (IsKeyReleased(KEY_ENTER) && !nickname_.empty()) {
       scene_ = SCENE_ROOM_SELECT;
       selection_ = 0;
       client_.nickname = nickname_;
@@ -574,6 +574,18 @@ private:
                      20 * h_ratio_, LIGHTGRAY);
     DrawTextCentered(room_members.c_str(), 400 * w_ratio_, 120 * h_ratio_,
                      20 * h_ratio_, LIGHTGRAY);
+  
+    if(client_.room_state) {
+      RoomState& room = *client_.room_state;
+      for(int i = 0; i < PLAYERS_PER_ROOM; i++) {
+        if(!room.nicknames[i].empty()) {
+          char p[40];
+          snprintf(p, 20, "%s %d ms", room.nicknames[i].c_str(), room.pings[i]);
+          DrawTextCentered(p, 400 * w_ratio_, (160 + i*20) * h_ratio_,
+                       20 * h_ratio_, LIGHTGRAY);
+        }
+      }
+    }
   }
 
   void play_game() {

@@ -476,6 +476,7 @@ private:
         break;
       }
     }
+    sendPing(player);
     propogateRoomState(room_id);
     return true;
   }
@@ -498,6 +499,8 @@ private:
       if (room.players[i] == player) {
         room.players[i] = std::nullopt;
         connected_clients_[player] = -1;
+        room.room_state.nicknames[i] = "";
+        room.room_state.pings[i] = 0;
         room.room_state.num_connected--;
         if (room.room_state.num_connected != PLAYERS_PER_ROOM &&
             room.room_state.state == RS_PLAYING) {

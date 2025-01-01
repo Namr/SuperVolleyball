@@ -11,10 +11,10 @@ constexpr float arena_width = 800.0;
 constexpr float arena_height = 450.0;
 constexpr float paddle_width = 10.0;
 constexpr float paddle_height = 80.0;
-constexpr float paddle_speed = 100.0;
+constexpr float paddle_speed = 160.0;
 constexpr float ball_radius = 7.0;
-constexpr float init_ball_speed = 200.0;
-constexpr float max_ball_speed = 600.0;
+constexpr float init_ball_speed = 350.0;
+constexpr float max_ball_speed = 800.0;
 constexpr float ball_speed_inc = 50.0;
 constexpr float max_bounce_angle = 35.0;
 
