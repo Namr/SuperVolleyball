@@ -9,7 +9,7 @@
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingsockets.h>
 
-#include "network_signals.hpp"
+#include "game_state.hpp"
 
 using std::chrono::duration;
 using std::chrono::seconds;
@@ -43,7 +43,7 @@ public:
     // connect to server
     // TODO set server address from raylib input
     SteamNetworkingIPAddr server_address;
-    server_address.ParseString("127.0.0.1:25565");
+    server_address.ParseString("64.23.207.248:25565");
     SteamNetworkingConfigValue_t opt;
     opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
                (void *)connectionStatusCallback);
@@ -329,7 +329,7 @@ public:
   void start() {
     client_.start();
     InitWindow(horizontal_resolution_, vertical_resolution_, "SuperVolleyball");
-    SetTargetFPS(60);
+    SetTargetFPS(144);
     SetExitKey(0);
     client_.updateRoomList();
   }
@@ -370,6 +370,9 @@ public:
           room_selection();
         } else {
           if (client_.room_state->state == RS_WAITING) {
+            // reset any possible left over state
+            tick_ = 0;
+            time_accumulator_ = 0;
             wait_for_match_start();
           } else {
             play_game();
@@ -381,6 +384,7 @@ public:
   }
 
 private:
+  GameState previous_gamestate_;
   Client client_;
   size_t selection_ = 0;
   std::string nickname_;
@@ -550,6 +554,8 @@ private:
     time_accumulator_ += delta_time_;
     while (time_accumulator_ >= DESIRED_TICK_LENGTH) {
       time_accumulator_ -= DESIRED_TICK_LENGTH;
+      // store previous
+      previous_gamestate_ = client_.game_state;
 
       // input handling
       InputMessage input = getInput(tick_);
@@ -564,7 +570,10 @@ private:
       tick_++;
     }
 
-    drawGameState(client_.game_state, horizontal_resolution_ / arena_width,
+    // interpolate before drawing
+    double a = time_accumulator_ / DESIRED_TICK_LENGTH;
+    GameState state = interpolate(previous_gamestate_, client_.game_state, a);
+    drawGameState(state, horizontal_resolution_ / arena_width,
                   vertical_resolution_ / arena_height);
     drawRoomState(*client_.room_state, horizontal_resolution_ / arena_width,
                   vertical_resolution_ / arena_height);

@@ -1,7 +1,34 @@
-#include "network_signals.hpp"
+#include "game_state.hpp"
 #include <algorithm>
 #include <math.h>
 
+Vec2 interpolate(Vec2 &previous, Vec2 &next, double a) {
+  Vec2 ret;
+  ret.x = next.x * a + previous.x * (1.0 - a);
+  ret.y = next.y * a + previous.y * (1.0 - a);
+  return ret;
+}
+
+PhysicsState interpolate(PhysicsState &previous, PhysicsState &next, double a) {
+  PhysicsState ret;
+  ret.vel = interpolate(previous.vel, next.vel, a);
+  ret.pos = interpolate(previous.pos, next.pos, a);
+  return ret;
+}
+
+GameState interpolate(GameState &previous, GameState &next, double a) {
+  GameState ret;
+  ret.p1_paddle = interpolate(previous.p1_paddle, next.p1_paddle, a);
+  ret.p2_paddle = interpolate(previous.p2_paddle, next.p2_paddle, a);
+  ret.ball = interpolate(previous.ball, next.ball, a);
+
+  // things that should just snap to previous
+  ret.ball_speed = previous.ball_speed;
+  ret.p1_score = previous.p1_score;
+  ret.p2_score = previous.p2_score;
+  ret.tick = previous.tick;
+  return ret;
+}
 void resetGameState(GameState &state) {
   state.p1_paddle.vel.x = 0;
   state.p1_paddle.vel.y = 0;

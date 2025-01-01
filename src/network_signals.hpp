@@ -1,5 +1,4 @@
 #pragma once
-#include "game_state.hpp"
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/array.hpp>
 #include <cereal/types/string.hpp>
@@ -12,6 +11,8 @@ constexpr uint16_t MSG_ROOM_REQUEST = 1;
 constexpr uint16_t MSG_CLIENT_INPUT = 2;
 constexpr uint16_t MSG_ROOM_STATE = 3;
 constexpr uint16_t MSG_GAME_STATE = 4;
+
+constexpr size_t PLAYERS_PER_ROOM = 2;
 
 struct MessageTag {
   uint16_t type;
@@ -66,10 +67,3 @@ struct InputMessage {
     archive(tick, up, down);
   }
 };
-
-void updatePlayerState(GameState &state, const InputMessage &input,
-                       const double delta_time, uint8_t player);
-
-void updateGameState(GameState &state, double delta_time);
-
-void resetGameState(GameState &state);

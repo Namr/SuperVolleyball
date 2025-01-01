@@ -12,7 +12,7 @@
 #include <thread>
 #include <unordered_map>
 
-#include "network_signals.hpp"
+#include "game_state.hpp"
 
 using std::chrono::duration;
 using std::chrono::seconds;
@@ -48,6 +48,7 @@ public:
     {
       std::scoped_lock l(lock);
       room_state.state = RS_WAITING;
+      message_queue_.clear();
     }
     game_tick_thread_.join();
   }
@@ -125,7 +126,7 @@ private:
             } else if (input_iterator->first.tick < tick) {
               std::cout << "client is behind!!! " << input_iterator->first.tick
                         << " vs " << tick << std::endl;
-              input_iterator = message_queue_.erase(input_iterator);
+              message_queue_.clear();
             } else {
               input_iterator++;
             }
@@ -195,7 +196,6 @@ public:
     while (!should_quit_) {
       handleMessages();
       runCallbacks();
-      // TODO: update game state
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }

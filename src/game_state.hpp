@@ -1,9 +1,9 @@
 #pragma once
+#include "network_signals.hpp"
 #include <cereal/archives/binary.hpp>
 #include <stdint.h>
 
 constexpr size_t MAX_ROOMS = 16;
-constexpr size_t PLAYERS_PER_ROOM = 2;
 constexpr double TICK_RATE = 64.0;
 constexpr double DESIRED_TICK_LENGTH = 1.0 / TICK_RATE;
 
@@ -78,3 +78,14 @@ struct GameState {
 
   bool operator!=(const GameState &c) { return !(*this == c); }
 };
+
+Vec2 interpolate(Vec2 &previous, Vec2 &next, double a);
+PhysicsState interpolate(PhysicsState &previous, PhysicsState &next, double a);
+GameState interpolate(GameState &previous, GameState &next, double a);
+
+void updatePlayerState(GameState &state, const InputMessage &input,
+                       const double delta_time, uint8_t player);
+
+void updateGameState(GameState &state, double delta_time);
+
+void resetGameState(GameState &state);
