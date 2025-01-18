@@ -22,7 +22,7 @@ using std::chrono::steady_clock;
 using std::chrono::system_clock;
 
 constexpr uint16_t PORT = 25565;
-constexpr uint32_t CLIENT_RUNWAY = 6;
+constexpr uint32_t CLIENT_RUNWAY = 2;
 
 class Room {
 public:
