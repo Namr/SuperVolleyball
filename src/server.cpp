@@ -127,10 +127,6 @@ private:
               updatePlayerState(game_state, input_iterator->first,
                                 DESIRED_TICK_LENGTH, input_iterator->second);
               input_iterator = message_queue_.erase(input_iterator);
-            } else if (input_iterator->first.tick < tick) {
-              std::cout << "client is behind!!! " << input_iterator->first.tick
-                        << " vs " << tick << std::endl;
-              message_queue_.clear();
             } else {
               input_iterator++;
             }

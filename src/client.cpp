@@ -15,7 +15,7 @@ using std::chrono::duration;
 using std::chrono::seconds;
 using std::chrono::steady_clock;
 
-constexpr size_t INPUT_HISTORY_CAPACITY = 30;
+constexpr size_t INPUT_HISTORY_CAPACITY = 300;
 constexpr int SCENE_MAIN_MENU = 0;
 constexpr int SCENE_ROOM_SELECT = 1;
 constexpr int SCENE_SETTINGS = 2;
@@ -148,6 +148,7 @@ public:
           // if we outran our buffer ...?
           // FIXME: this can lead to a desync lol
           if (!found_id) {
+            std::cout << "we didn't find id: " << game_state_msg.tick << " and we're on id: " << game_state.tick << std::endl;
           }
         }
       } else {
