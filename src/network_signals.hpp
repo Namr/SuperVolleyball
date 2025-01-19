@@ -13,7 +13,7 @@ constexpr uint16_t MSG_ROOM_STATE = 3;
 constexpr uint16_t MSG_GAME_STATE = 4;
 constexpr uint16_t MSG_PING = 5;
 
-constexpr size_t PLAYERS_PER_ROOM = 2;
+constexpr size_t PLAYERS_PER_ROOM = 4;
 
 struct MessageTag {
   uint16_t type;
@@ -52,8 +52,8 @@ struct RoomState {
   int current_room = -1;
   int num_connected = 0;
   int player_index = -1;
-  std::array<std::string, PLAYERS_PER_ROOM> nicknames = {"", ""};
-  std::array<uint32_t, PLAYERS_PER_ROOM> pings = {0, 0};
+  std::array<std::string, PLAYERS_PER_ROOM> nicknames = {"", "", "", ""};
+  std::array<uint32_t, PLAYERS_PER_ROOM> pings = {0, 0, 0, 0};
 
   template <class Archive> void serialize(Archive &archive) {
     archive(state, current_room, num_connected, player_index, nicknames, pings);
@@ -64,9 +64,11 @@ struct InputMessage {
   uint32_t tick = 0;
   bool up = false;
   bool down = false;
+  bool left = false;
+  bool right = false;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(tick, up, down);
+    archive(tick, up, down, left, right);
   }
 };
 

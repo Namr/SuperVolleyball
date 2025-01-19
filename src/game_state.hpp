@@ -9,14 +9,15 @@ constexpr double DESIRED_TICK_LENGTH = 1.0 / TICK_RATE;
 
 constexpr float arena_width = 800.0;
 constexpr float arena_height = 450.0;
-constexpr float paddle_width = 10.0;
-constexpr float paddle_height = 80.0;
+constexpr float paddle_width = 20.0;
+constexpr float paddle_height = 20.0;
 constexpr float paddle_speed = 160.0;
 constexpr float ball_radius = 7.0;
-constexpr float init_ball_speed = 350.0;
-constexpr float max_ball_speed = 800.0;
+constexpr float init_ball_speed = 100.0;
+constexpr float max_ball_speed = 300.0;
 constexpr float ball_speed_inc = 50.0;
 constexpr float max_bounce_angle = 35.0;
+constexpr float center_line_width = 10.0;
 
 constexpr double EPSILON = 0.8;
 inline bool fcmp(float a, float b) { return std::abs(a - b) < EPSILON; }
@@ -58,8 +59,10 @@ struct PhysicsState {
 };
 
 struct GameState {
-  PhysicsState p1_paddle;
-  PhysicsState p2_paddle;
+  PhysicsState p1;
+  PhysicsState p2;
+  PhysicsState p3;
+  PhysicsState p4;
   PhysicsState ball;
   uint16_t p1_score = 0;
   uint16_t p2_score = 0;
@@ -67,11 +70,11 @@ struct GameState {
   uint32_t tick = 0;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(p1_paddle, p2_paddle, ball, p1_score, p2_score, ball_speed, tick);
+    archive(p1, p2, p3, p4, ball, p1_score, p2_score, ball_speed, tick);
   }
 
   bool operator==(const GameState &c) {
-    return p1_paddle == c.p1_paddle && p2_paddle == c.p2_paddle &&
+    return p1 == c.p1 && p2 == c.p2 && p3 == c.p3 && p4 == c.p4 &&
            ball == c.ball && p1_score == c.p1_score && p2_score == c.p2_score &&
            fcmp(ball_speed, c.ball_speed) && tick == c.tick;
   }

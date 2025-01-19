@@ -124,11 +124,13 @@ public:
               if (game_state_msg.tick == p.first.tick) {
                 found_id = true;
                 if (game_state_msg != p.second) {
+                  /*
                   std::cout << "disagreement on tick: " << game_state_msg.tick;
                   std::cout << " ( " << game_state_msg.ball.pos.x << ", "
                             << game_state_msg.ball.pos.y << ") vs ";
                   std::cout << " ( " << p.second.ball.pos.x << ", "
                             << p.second.ball.pos.y << ")\n";
+                  */
                   is_recomputing = true;
                   p.second = game_state_msg;
                   running_gamestate = game_state_msg;
@@ -148,7 +150,8 @@ public:
           // if we outran our buffer ...?
           // FIXME: this can lead to a desync lol
           if (!found_id) {
-            std::cout << "we didn't find id: " << game_state_msg.tick << " and we're on id: " << game_state.tick << std::endl;
+            std::cout << "we didn't find id: " << game_state_msg.tick
+                      << " and we're on id: " << game_state.tick << std::endl;
           }
         }
       } else {
@@ -293,17 +296,23 @@ InputMessage getInput(uint32_t tick) {
   i.tick = tick;
   i.up = IsKeyDown(KEY_UP);
   i.down = IsKeyDown(KEY_DOWN);
+  i.left = IsKeyDown(KEY_LEFT);
+  i.right = IsKeyDown(KEY_RIGHT);
   return i;
 }
 
 void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // game pieces
-  DrawRectangle((int)state.p1_paddle.pos.x * w_ratio,
-                (int)state.p1_paddle.pos.y * h_ratio,
+  DrawRectangle((int)state.p1.pos.x * w_ratio, (int)state.p1.pos.y * h_ratio,
                 (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
                 WHITE);
-  DrawRectangle((int)state.p2_paddle.pos.x * w_ratio,
-                (int)state.p2_paddle.pos.y * h_ratio,
+  DrawRectangle((int)state.p2.pos.x * w_ratio, (int)state.p2.pos.y * h_ratio,
+                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
+                WHITE);
+  DrawRectangle((int)state.p3.pos.x * w_ratio, (int)state.p3.pos.y * h_ratio,
+                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
+                WHITE);
+  DrawRectangle((int)state.p4.pos.x * w_ratio, (int)state.p4.pos.y * h_ratio,
                 (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
                 WHITE);
 
@@ -315,7 +324,7 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // divider lines
   constexpr int num_lines = 6;
   const int space_between_divider = 30 * h_ratio;
-  const int rect_width = 10 * w_ratio;
+  const int rect_width = center_line_width * w_ratio;
   const int rect_spacing = ((arena_height * h_ratio) / num_lines);
   const int rect_height = rect_spacing - space_between_divider;
   for (int i = 0; i < num_lines; i++) {
@@ -575,15 +584,15 @@ private:
                      20 * h_ratio_, LIGHTGRAY);
     DrawTextCentered(room_members.c_str(), 400 * w_ratio_, 120 * h_ratio_,
                      20 * h_ratio_, LIGHTGRAY);
-  
-    if(client_.room_state) {
-      RoomState& room = *client_.room_state;
-      for(int i = 0; i < PLAYERS_PER_ROOM; i++) {
-        if(!room.nicknames[i].empty()) {
+
+    if (client_.room_state) {
+      RoomState &room = *client_.room_state;
+      for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+        if (!room.nicknames[i].empty()) {
           char p[40];
           snprintf(p, 20, "%s %d ms", room.nicknames[i].c_str(), room.pings[i]);
-          DrawTextCentered(p, 400 * w_ratio_, (160 + i*20) * h_ratio_,
-                       20 * h_ratio_, LIGHTGRAY);
+          DrawTextCentered(p, 400 * w_ratio_, (160 + i * 20) * h_ratio_,
+                           20 * h_ratio_, LIGHTGRAY);
         }
       }
     }
