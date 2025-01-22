@@ -23,12 +23,18 @@ GameState interpolate(GameState &previous, GameState &next, double a) {
   ret.p3 = interpolate(previous.p3, next.p3, a);
   ret.p4 = interpolate(previous.p4, next.p4, a);
   ret.ball = interpolate(previous.ball, next.ball, a);
+  ret.target = interpolate(previous.target, next.target, a);
+
+  ret.timer = next.timer * a + previous.timer * (1.0 - a);
 
   // things that should just snap to previous
-  ret.ball_speed = previous.ball_speed;
   ret.p1_score = previous.p1_score;
   ret.p2_score = previous.p2_score;
+  ret.ball_speed = previous.ball_speed;
   ret.tick = previous.tick;
+
+  ret.ball_state = previous.ball_state;
+  ret.ball_owner = previous.ball_owner;
   return ret;
 }
 void resetGameState(GameState &state) {
@@ -52,11 +58,21 @@ void resetGameState(GameState &state) {
   state.p4.pos.x = arena_width - paddle_width;
   state.p4.pos.y = 3.0f * (arena_height / 4.0);
 
+  state.target.vel.x = 0;
+  state.target.vel.y = 0;
+  state.target.pos.x = 0;
+  state.target.pos.y = 0;
+
   state.ball_speed = init_ball_speed;
   state.ball.vel.x = -state.ball_speed;
   state.ball.vel.y = 0;
   state.ball.pos.x = arena_width / 2.0;
   state.ball.pos.y = arena_height / 2.0;
+
+  state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.ball_owner = 1;
+
+  state.timer = 0.0;
 
   state.p1_score = 0;
   state.p2_score = 0;
@@ -87,6 +103,16 @@ void resetRound(GameState &state) {
   state.ball.vel.y = 0;
   state.ball.pos.x = arena_width / 2.0;
   state.ball.pos.y = arena_height / 2.0;
+
+  state.target.vel.x = 0;
+  state.target.vel.y = 0;
+  state.target.pos.x = 0;
+  state.target.pos.y = 0;
+
+  state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.ball_owner = 1; // FIXME: service rotation rules
+
+  state.timer = 0.0;
 }
 
 void updatePlayerState(GameState &state, const InputMessage &input,
@@ -142,6 +168,47 @@ void updatePlayerState(GameState &state, const InputMessage &input,
   paddle->pos.y += paddle->vel.y * delta_time;
 
   paddle->pos.y = std::clamp(paddle->pos.y, 0.0f, arena_height - paddle_height);
+
+  // ball_owner is 1 indexed and 0 is N/A; player is 0  indexed
+  if (state.ball_owner == player + 1) {
+    if (input.target_up) {
+      state.target.vel.y = -target_speed;
+    }
+    if (input.target_down) {
+      state.target.vel.y = target_speed;
+    }
+
+    if ((input.target_up | input.target_down) == false) {
+      state.target.vel.y = 0.0;
+    }
+
+    if (input.target_left) {
+      state.target.vel.x = -target_speed;
+    }
+    if (input.target_right) {
+      state.target.vel.x = target_speed;
+    }
+
+    if ((input.target_left | input.target_right) == false) {
+      state.target.vel.x = 0.0;
+    }
+
+    // normalize velocity
+    float magnitude = std::sqrt((state.target.vel.x * state.target.vel.x) +
+                                (state.target.vel.y * state.target.vel.y));
+    if (magnitude > 0.01) {
+      state.target.vel.x = (state.target.vel.x / magnitude) * target_speed;
+      state.target.vel.y = (state.target.vel.y / magnitude) * target_speed;
+    }
+
+    state.target.pos.x += state.target.vel.x * delta_time;
+    state.target.pos.y += state.target.vel.y * delta_time;
+
+    state.target.pos.x =
+        std::clamp(state.target.pos.x, 0.0f, arena_width - target_radius);
+    state.target.pos.y =
+        std::clamp(state.target.pos.y, 0.0f, arena_height - target_radius);
+  }
 }
 
 void updateGameState(GameState &state, double delta_time) {

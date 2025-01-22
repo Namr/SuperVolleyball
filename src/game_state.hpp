@@ -12,6 +12,8 @@ constexpr float arena_height = 450.0;
 constexpr float paddle_width = 20.0;
 constexpr float paddle_height = 20.0;
 constexpr float paddle_speed = 160.0;
+constexpr float target_speed = 160.0;
+constexpr float target_radius = 10.0;
 constexpr float ball_radius = 7.0;
 constexpr float init_ball_speed = 100.0;
 constexpr float max_ball_speed = 300.0;
@@ -58,25 +60,36 @@ struct PhysicsState {
   }
 };
 
+constexpr uint32_t BALL_STATE_READY_TO_SERVE = 0;
+constexpr uint32_t BALL_STATE_IN_SERVICE = 1;
+constexpr uint32_t BALL_STATE_TRAVELLING = 2;
+
 struct GameState {
   PhysicsState p1;
   PhysicsState p2;
   PhysicsState p3;
   PhysicsState p4;
   PhysicsState ball;
+  PhysicsState target;
   uint16_t p1_score = 0;
   uint16_t p2_score = 0;
   float ball_speed = 0.0;
   uint32_t tick = 0;
+  uint32_t ball_state = BALL_STATE_READY_TO_SERVE;
+  uint32_t ball_owner = 1; // who is serving the ball right now 1-4; 0 -> no-one
+  float timer = 0.0;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(p1, p2, p3, p4, ball, p1_score, p2_score, ball_speed, tick);
+    archive(p1, p2, p3, p4, ball, target, p1_score, p2_score, ball_speed, tick,
+            ball_state, ball_owner, timer);
   }
 
   bool operator==(const GameState &c) {
     return p1 == c.p1 && p2 == c.p2 && p3 == c.p3 && p4 == c.p4 &&
-           ball == c.ball && p1_score == c.p1_score && p2_score == c.p2_score &&
-           fcmp(ball_speed, c.ball_speed) && tick == c.tick;
+           ball == c.ball && target == c.target && p1_score == c.p1_score &&
+           p2_score == c.p2_score && fcmp(ball_speed, c.ball_speed) &&
+           tick == c.tick && ball_state == c.ball_state &&
+           ball_owner == c.ball_owner && fcmp(timer, c.timer);
   }
 
   bool operator!=(const GameState &c) { return !(*this == c); }

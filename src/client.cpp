@@ -298,6 +298,15 @@ InputMessage getInput(uint32_t tick) {
   i.down = IsKeyDown(KEY_DOWN);
   i.left = IsKeyDown(KEY_LEFT);
   i.right = IsKeyDown(KEY_RIGHT);
+
+  i.target_up = IsKeyDown(KEY_W);
+  i.target_down = IsKeyDown(KEY_S);
+  i.target_left = IsKeyDown(KEY_A);
+  i.target_right = IsKeyDown(KEY_D);
+
+  i.jump = IsKeyDown(KEY_SPACE);
+  i.hit = IsKeyDown(KEY_E);
+
   return i;
 }
 
@@ -320,6 +329,10 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
                 (int)(state.ball.pos.y - ball_radius) * h_ratio,
                 (int)ball_radius * 2 * w_ratio, (int)ball_radius * 2 * h_ratio,
                 WHITE);
+
+  DrawCircleLines((int)state.target.pos.x * w_ratio,
+                  (int)state.target.pos.y * h_ratio,
+                  (int)target_radius * 2 * h_ratio, WHITE);
 
   // divider lines
   constexpr int num_lines = 6;

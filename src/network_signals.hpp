@@ -67,8 +67,17 @@ struct InputMessage {
   bool left = false;
   bool right = false;
 
+  bool target_up = false;
+  bool target_down = false;
+  bool target_left = false;
+  bool target_right = false;
+
+  bool jump = false;
+  bool hit = false;
+
   template <class Archive> void serialize(Archive &archive) {
-    archive(tick, up, down, left, right);
+    archive(tick, up, down, left, right, target_up, target_down, target_left,
+            target_right, jump, hit);
   }
 };
 
