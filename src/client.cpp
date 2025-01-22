@@ -22,6 +22,8 @@ constexpr int SCENE_SETTINGS = 2;
 constexpr int SCENE_SET_NAME = 3;
 constexpr uint16_t NICKNAME_MAX_LENGTH = 6;
 
+constexpr float Z_TO_SIZE_RATIO = 0.3;
+
 constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
     std::make_pair(800, 450), std::make_pair(1280, 820),
     std::make_pair(1920, 1080), std::make_pair(2560, 1440)};
@@ -312,23 +314,31 @@ InputMessage getInput(uint32_t tick) {
 
 void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // game pieces
-  DrawRectangle((int)state.p1.pos.x * w_ratio, (int)state.p1.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
-                WHITE);
-  DrawRectangle((int)state.p2.pos.x * w_ratio, (int)state.p2.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
-                WHITE);
-  DrawRectangle((int)state.p3.pos.x * w_ratio, (int)state.p3.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
-                WHITE);
-  DrawRectangle((int)state.p4.pos.x * w_ratio, (int)state.p4.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
-                WHITE);
+  DrawRectangle(
+      (int)state.p1.pos.x * w_ratio, (int)state.p1.pos.y * h_ratio,
+      (int)(paddle_width + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
+  DrawRectangle(
+      (int)state.p2.pos.x * w_ratio, (int)state.p2.pos.y * h_ratio,
+      (int)(paddle_width + (state.p2.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p2.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
+  DrawRectangle(
+      (int)state.p3.pos.x * w_ratio, (int)state.p3.pos.y * h_ratio,
+      (int)(paddle_width + (state.p3.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p3.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
+  DrawRectangle(
+      (int)state.p4.pos.x * w_ratio, (int)state.p4.pos.y * h_ratio,
+      (int)(paddle_width + (state.p4.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p4.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
 
-  DrawRectangle((int)(state.ball.pos.x - ball_radius) * w_ratio,
-                (int)(state.ball.pos.y - ball_radius) * h_ratio,
-                (int)ball_radius * 2 * w_ratio, (int)ball_radius * 2 * h_ratio,
-                WHITE);
+  int adjusted_ball_radius =
+      (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) * w_ratio;
+  DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
+             adjusted_ball_radius, WHITE);
 
   DrawCircleLines((int)state.target.pos.x * w_ratio,
                   (int)state.target.pos.y * h_ratio,

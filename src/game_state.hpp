@@ -9,47 +9,59 @@ constexpr double DESIRED_TICK_LENGTH = 1.0 / TICK_RATE;
 
 constexpr float arena_width = 800.0;
 constexpr float arena_height = 450.0;
-constexpr float paddle_width = 20.0;
-constexpr float paddle_height = 20.0;
+constexpr float paddle_width = 25.0;
+constexpr float paddle_height = 25.0;
+constexpr float starting_dist_from_screen = 20.0;
 constexpr float paddle_speed = 160.0;
 constexpr float target_speed = 160.0;
 constexpr float target_radius = 10.0;
-constexpr float ball_radius = 7.0;
+constexpr float ball_radius = 15.0;
 constexpr float init_ball_speed = 100.0;
 constexpr float max_ball_speed = 300.0;
+constexpr float ball_up_speed = 50.0;
 constexpr float ball_speed_inc = 50.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
 
+constexpr float service_hittable_time = 0.5;
+constexpr float service_max_time = 0.8;
+
 constexpr double EPSILON = 0.8;
 inline bool fcmp(float a, float b) { return std::abs(a - b) < EPSILON; }
 
-struct Vec2 {
+struct Vec3 {
   float x = 0.0;
   float y = 0.0;
+  float z = 0.0;
 
-  template <class Archive> void serialize(Archive &archive) { archive(x, y); }
+  template <class Archive> void serialize(Archive &archive) {
+    archive(x, y, z);
+  }
 
-  bool operator==(const Vec2 &c) { return fcmp(x, c.x) && fcmp(y, c.y); }
+  bool operator==(const Vec3 &c) {
+    return fcmp(x, c.x) && fcmp(y, c.y) && fcmp(z, c.z);
+  }
 
-  Vec2 operator+(const Vec2 &c) {
-    Vec2 ret;
+  Vec3 operator+(const Vec3 &c) {
+    Vec3 ret;
     ret.x = c.x + x;
     ret.y = c.y + y;
+    ret.z = c.z + z;
     return ret;
   }
 
-  Vec2 operator-(const Vec2 &c) {
-    Vec2 ret;
+  Vec3 operator-(const Vec3 &c) {
+    Vec3 ret;
     ret.x = c.x - x;
     ret.y = c.y - y;
+    ret.z = c.z + z;
     return ret;
   }
 };
 
 struct PhysicsState {
-  Vec2 pos;
-  Vec2 vel;
+  Vec3 pos;
+  Vec3 vel;
 
   template <class Archive> void serialize(Archive &archive) {
     archive(pos, vel);
@@ -63,6 +75,7 @@ struct PhysicsState {
 constexpr uint32_t BALL_STATE_READY_TO_SERVE = 0;
 constexpr uint32_t BALL_STATE_IN_SERVICE = 1;
 constexpr uint32_t BALL_STATE_TRAVELLING = 2;
+constexpr uint32_t BALL_STATE_FAILED_SERVICE = 3;
 
 struct GameState {
   PhysicsState p1;
@@ -95,7 +108,7 @@ struct GameState {
   bool operator!=(const GameState &c) { return !(*this == c); }
 };
 
-Vec2 interpolate(Vec2 &previous, Vec2 &next, double a);
+Vec3 interpolate(Vec3 &previous, Vec3 &next, double a);
 PhysicsState interpolate(PhysicsState &previous, PhysicsState &next, double a);
 GameState interpolate(GameState &previous, GameState &next, double a);
 

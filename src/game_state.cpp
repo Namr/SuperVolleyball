@@ -2,10 +2,11 @@
 #include <algorithm>
 #include <math.h>
 
-Vec2 interpolate(Vec2 &previous, Vec2 &next, double a) {
-  Vec2 ret;
+Vec3 interpolate(Vec3 &previous, Vec3 &next, double a) {
+  Vec3 ret;
   ret.x = next.x * a + previous.x * (1.0 - a);
   ret.y = next.y * a + previous.y * (1.0 - a);
+  ret.z = next.z * a + previous.z * (1.0 - a);
   return ret;
 }
 
@@ -37,88 +38,10 @@ GameState interpolate(GameState &previous, GameState &next, double a) {
   ret.ball_owner = previous.ball_owner;
   return ret;
 }
-void resetGameState(GameState &state) {
-  state.p1.vel.x = 0;
-  state.p1.vel.y = 0;
-  state.p1.pos.x = 0;
-  state.p1.pos.y = arena_height / 4.0;
 
-  state.p2.vel.x = 0;
-  state.p2.vel.y = 0;
-  state.p2.pos.x = 0;
-  state.p2.pos.y = 3.0f * (arena_height / 4.0);
-
-  state.p3.vel.x = 0;
-  state.p3.vel.y = 0;
-  state.p3.pos.x = arena_width - paddle_width;
-  state.p3.pos.y = arena_height / 4.0;
-
-  state.p4.vel.x = 0;
-  state.p4.vel.y = 0;
-  state.p4.pos.x = arena_width - paddle_width;
-  state.p4.pos.y = 3.0f * (arena_height / 4.0);
-
-  state.target.vel.x = 0;
-  state.target.vel.y = 0;
-  state.target.pos.x = 0;
-  state.target.pos.y = 0;
-
-  state.ball_speed = init_ball_speed;
-  state.ball.vel.x = -state.ball_speed;
-  state.ball.vel.y = 0;
-  state.ball.pos.x = arena_width / 2.0;
-  state.ball.pos.y = arena_height / 2.0;
-
-  state.ball_state = BALL_STATE_READY_TO_SERVE;
-  state.ball_owner = 1;
-
-  state.timer = 0.0;
-
-  state.p1_score = 0;
-  state.p2_score = 0;
-}
-
-void resetRound(GameState &state) {
-  state.p1.vel.x = 0;
-  state.p1.vel.y = 0;
-  state.p1.pos.x = 0;
-  state.p1.pos.y = arena_height / 4.0;
-
-  state.p2.vel.x = 0;
-  state.p2.vel.y = 0;
-  state.p2.pos.x = 0;
-  state.p2.pos.y = 3.0f * (arena_height / 4.0);
-
-  state.p3.vel.x = 0;
-  state.p3.vel.y = 0;
-  state.p3.pos.x = arena_width - paddle_width;
-  state.p3.pos.y = arena_height / 4.0;
-
-  state.p4.vel.x = 0;
-  state.p4.vel.y = 0;
-  state.p4.pos.x = arena_width - paddle_width;
-  state.p4.pos.y = 3.0f * (arena_height / 4.0);
-
-  state.ball.vel.x = -state.ball_speed;
-  state.ball.vel.y = 0;
-  state.ball.pos.x = arena_width / 2.0;
-  state.ball.pos.y = arena_height / 2.0;
-
-  state.target.vel.x = 0;
-  state.target.vel.y = 0;
-  state.target.pos.x = 0;
-  state.target.pos.y = 0;
-
-  state.ball_state = BALL_STATE_READY_TO_SERVE;
-  state.ball_owner = 1; // FIXME: service rotation rules
-
-  state.timer = 0.0;
-}
-
-void updatePlayerState(GameState &state, const InputMessage &input,
-                       const double delta_time, uint8_t player) {
+PhysicsState *playerFromIndex(GameState &state, int idx) {
   PhysicsState *paddle = nullptr;
-  switch (player) {
+  switch (idx) {
   case 0:
     paddle = &state.p1;
     break;
@@ -133,41 +56,117 @@ void updatePlayerState(GameState &state, const InputMessage &input,
     paddle = &state.p4;
     break;
   }
+  return paddle;
+}
 
-  if (input.up) {
-    paddle->vel.y = -paddle_speed;
-  }
-  if (input.down) {
-    paddle->vel.y = paddle_speed;
-  }
+void resetGameState(GameState &state) {
+  state.p1.vel.x = 0;
+  state.p1.vel.y = 0;
+  state.p1.vel.z = 0;
+  state.p1.pos.x = starting_dist_from_screen;
+  state.p1.pos.y = arena_height / 4.0;
+  state.p1.pos.z = 0;
 
-  if ((input.up | input.down) == false) {
-    paddle->vel.y = 0.0;
-  }
+  state.p2.vel.x = 0;
+  state.p2.vel.y = 0;
+  state.p2.vel.z = 0;
+  state.p2.pos.x = starting_dist_from_screen;
+  state.p2.pos.y = 3.0f * (arena_height / 4.0);
+  state.p2.pos.z = 0;
 
-  if (input.left) {
-    paddle->vel.x = -paddle_speed;
-  }
-  if (input.right) {
-    paddle->vel.x = paddle_speed;
-  }
+  state.p3.vel.x = 0;
+  state.p3.vel.y = 0;
+  state.p3.vel.z = 0;
+  state.p3.pos.x = arena_width - paddle_width - starting_dist_from_screen;
+  state.p3.pos.y = arena_height / 4.0;
+  state.p3.pos.z = 0;
 
-  if ((input.left | input.right) == false) {
-    paddle->vel.x = 0.0;
-  }
+  state.p4.vel.x = 0;
+  state.p4.vel.y = 0;
+  state.p4.vel.z = 0;
+  state.p4.pos.x = arena_width - paddle_width - starting_dist_from_screen;
+  state.p4.pos.y = 3.0f * (arena_height / 4.0);
+  state.p4.pos.z = 0;
 
-  // normalize velocity
-  float magnitude = std::sqrt((paddle->vel.x * paddle->vel.x) +
-                              (paddle->vel.y * paddle->vel.y));
-  if (magnitude > 0.01) {
-    paddle->vel.x = (paddle->vel.x / magnitude) * paddle_speed;
-    paddle->vel.y = (paddle->vel.y / magnitude) * paddle_speed;
-  }
+  state.target.vel.x = 0;
+  state.target.vel.y = 0;
+  state.target.vel.z = 0;
+  state.target.pos.x = 0;
+  state.target.pos.y = 0;
+  state.target.pos.z = 0;
 
-  paddle->pos.x += paddle->vel.x * delta_time;
-  paddle->pos.y += paddle->vel.y * delta_time;
+  PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
+  state.ball_speed = init_ball_speed;
+  state.ball.vel.x = 0;
+  state.ball.vel.y = 0;
+  state.ball.vel.z = 0;
+  state.ball.pos.x = owning_player->pos.x;
+  state.ball.pos.y = owning_player->pos.y;
+  state.ball.pos.z = 0;
 
-  paddle->pos.y = std::clamp(paddle->pos.y, 0.0f, arena_height - paddle_height);
+  state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.ball_owner = 1;
+
+  state.timer = 0.0;
+
+  state.p1_score = 0;
+  state.p2_score = 0;
+}
+
+void resetRound(GameState &state) {
+  state.p1.vel.x = 0;
+  state.p1.vel.y = 0;
+  state.p1.vel.z = 0;
+  state.p1.pos.x = starting_dist_from_screen;
+  state.p1.pos.y = arena_height / 4.0;
+  state.p1.pos.z = 0;
+
+  state.p2.vel.x = 0;
+  state.p2.vel.y = 0;
+  state.p2.vel.z = 0;
+  state.p2.pos.x = starting_dist_from_screen;
+  state.p2.pos.y = 3.0f * (arena_height / 4.0);
+  state.p2.pos.z = 0;
+
+  state.p3.vel.x = 0;
+  state.p3.vel.y = 0;
+  state.p3.vel.z = 0;
+  state.p3.pos.x = arena_width - paddle_width - starting_dist_from_screen;
+  state.p3.pos.y = arena_height / 4.0;
+  state.p3.pos.z = 0;
+
+  state.p4.vel.x = 0;
+  state.p4.vel.y = 0;
+  state.p4.vel.z = 0;
+  state.p4.pos.x = arena_width - paddle_width - starting_dist_from_screen;
+  state.p4.pos.y = 3.0f * (arena_height / 4.0);
+  state.p4.pos.z = 0;
+
+  state.target.vel.x = 0;
+  state.target.vel.y = 0;
+  state.target.vel.z = 0;
+  state.target.pos.x = 0;
+  state.target.pos.y = 0;
+  state.target.pos.z = 0;
+
+  PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
+  state.ball_speed = init_ball_speed;
+  state.ball.vel.x = 0;
+  state.ball.vel.y = 0;
+  state.ball.vel.z = 0;
+  state.ball.pos.x = owning_player->pos.x;
+  state.ball.pos.y = owning_player->pos.y;
+  state.ball.pos.z = 0;
+
+  state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.ball_owner = 1; // FIXME: service rotation rules
+
+  state.timer = 0.0;
+}
+
+void updatePlayerState(GameState &state, const InputMessage &input,
+                       const double delta_time, uint8_t player) {
+  PhysicsState *paddle = playerFromIndex(state, player);
 
   // ball_owner is 1 indexed and 0 is N/A; player is 0  indexed
   if (state.ball_owner == player + 1) {
@@ -208,7 +207,56 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         std::clamp(state.target.pos.x, 0.0f, arena_width - target_radius);
     state.target.pos.y =
         std::clamp(state.target.pos.y, 0.0f, arena_height - target_radius);
+    state.target.pos.z = std::max(0.0f, state.target.pos.z);
+
+    // OWNER BALL STATE MACHINE
+    if (state.ball_state == BALL_STATE_READY_TO_SERVE) {
+      if (input.jump) {
+        state.ball.vel.z = 0;
+        state.timer = 0;
+        state.ball_state = BALL_STATE_IN_SERVICE;
+      }
+    }
+  } // END ball owner logic
+  else {
+    if (input.up) {
+      paddle->vel.y = -paddle_speed;
+    }
+    if (input.down) {
+      paddle->vel.y = paddle_speed;
+    }
+
+    if ((input.up | input.down) == false) {
+      paddle->vel.y = 0.0;
+    }
+
+    if (input.left) {
+      paddle->vel.x = -paddle_speed;
+    }
+    if (input.right) {
+      paddle->vel.x = paddle_speed;
+    }
+
+    if ((input.left | input.right) == false) {
+      paddle->vel.x = 0.0;
+    }
+
+    // normalize velocity
+    float magnitude = std::sqrt((paddle->vel.x * paddle->vel.x) +
+                                (paddle->vel.y * paddle->vel.y));
+    if (magnitude > 0.01) {
+      paddle->vel.x = (paddle->vel.x / magnitude) * paddle_speed;
+      paddle->vel.y = (paddle->vel.y / magnitude) * paddle_speed;
+    }
+
+    paddle->pos.x += paddle->vel.x * delta_time;
+    paddle->pos.y += paddle->vel.y * delta_time;
+
+    paddle->pos.y =
+        std::clamp(paddle->pos.y, 0.0f, arena_height - paddle_height);
+    paddle->pos.z = std::max(0.0f, paddle->pos.z);
   }
+  paddle->pos.z += paddle->vel.z * delta_time;
 }
 
 void updateGameState(GameState &state, double delta_time) {
@@ -225,58 +273,34 @@ void updateGameState(GameState &state, double delta_time) {
       std::clamp(state.p4.pos.x, (arena_width / 2.0f) + center_line_width,
                  arena_width - paddle_width);
 
-  // p1 side padle hit check
-  if (state.ball.pos.x <= paddle_width + ball_radius &&
-      state.ball.pos.y + ball_radius > state.p1.pos.y &&
-      state.ball.pos.y - ball_radius < state.p1.pos.y + paddle_height) {
+  // BALL STATE MACHINE
+  if (state.ball_state == BALL_STATE_IN_SERVICE) {
+    PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
+    state.timer += delta_time;
 
-    float paddle_center_y = (state.p1.pos.y + (paddle_height / 2.0));
-    float diff = state.ball.pos.y - paddle_center_y;
-    float normalized_diff = diff / ((paddle_height / 2.0) + ball_radius);
-    float angle = normalized_diff * (0.0174533 * 75.0);
+    // lock the ball to the player
+    state.ball.pos.x = owning_player->pos.x;
+    state.ball.pos.y = owning_player->pos.y;
 
-    state.ball.vel.x = state.ball_speed * cos(angle);
-    state.ball.vel.y = state.ball_speed * sin(angle);
-  }
+    // move the ball and player up
+    owning_player->vel.z = ball_up_speed;
+    state.ball.vel.z = ball_up_speed;
 
-  // p2 side padle hit check
-  if (state.ball.pos.x >= arena_width - (ball_radius + paddle_width) &&
-      state.ball.pos.y + ball_radius > state.p2.pos.y &&
-      state.ball.pos.y - ball_radius < state.p2.pos.y + paddle_height) {
-
-    float paddle_center_y = (state.p2.pos.y + (paddle_height / 2.0));
-    float diff = state.ball.pos.y - paddle_center_y;
-    float normalized_diff = diff / ((paddle_height / 2.0) + ball_radius);
-    float angle = normalized_diff * (0.0174533 * max_bounce_angle);
-
-    state.ball.vel.x = -state.ball_speed * cos(angle);
-    state.ball.vel.y = -state.ball_speed * sin(angle);
-  }
-
-  // if hitting top and bottom of screen, bounce
-  if (state.ball.pos.y < 0) {
-    state.ball.vel.y = -state.ball.vel.y;
-  }
-
-  if (state.ball.pos.y - ball_radius > arena_height) {
-    state.ball.vel.y = -state.ball.vel.y;
-  }
-
-  // if hitting out of bounds, change score & reset game
-  if (state.ball.pos.x < 0 && state.ball.vel.x < 0) {
-    resetRound(state);
-    state.p2_score++;
-    state.ball_speed =
-        std::min(state.ball_speed + ball_speed_inc, max_ball_speed);
-  }
-
-  if (state.ball.pos.x > arena_width && state.ball.vel.x > 0) {
-    resetRound(state);
-    state.p1_score++;
-    state.ball_speed =
-        std::min(state.ball_speed + ball_speed_inc, max_ball_speed);
+    // if timer is too large, you fail service
+    if (state.timer > service_max_time) {
+      state.ball_state = BALL_STATE_FAILED_SERVICE;
+    }
+  } else if (state.ball_state == BALL_STATE_FAILED_SERVICE) {
+    PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
+    state.timer = 0;
+    owning_player->vel.z = -2 * ball_up_speed;
+    state.ball.vel.z = -2 * ball_up_speed;
+    if (state.ball.pos.z < 0) {
+      resetRound(state);
+    }
   }
 
   // state.ball.pos.x += state.ball.vel.x * delta_time;
   // state.ball.pos.y += state.ball.vel.y * delta_time;
+  state.ball.pos.z += state.ball.vel.z * delta_time;
 }
