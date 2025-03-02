@@ -1,6 +1,7 @@
 #pragma once
 #include "network_signals.hpp"
 #include <cereal/archives/binary.hpp>
+#include <math.h>
 #include <stdint.h>
 
 constexpr size_t MAX_ROOMS = 16;
@@ -38,6 +39,8 @@ struct Vec3 {
     archive(x, y, z);
   }
 
+  float magnitude2D() { return std::sqrt((x * x) + (y * y)); }
+
   bool operator==(const Vec3 &c) {
     return fcmp(x, c.x) && fcmp(y, c.y) && fcmp(z, c.z);
   }
@@ -56,6 +59,20 @@ struct Vec3 {
     ret.y = c.y - y;
     ret.z = c.z + z;
     return ret;
+  }
+
+  Vec3 operator*(const float c) {
+    Vec3 ret = *this;
+    ret.x *= c;
+    ret.y *= c;
+    ret.z *= c;
+    return ret;
+  }
+
+  void operator*=(const float c) {
+    x *= c;
+    y *= c;
+    z *= c;
   }
 };
 
@@ -76,6 +93,7 @@ constexpr uint32_t BALL_STATE_READY_TO_SERVE = 0;
 constexpr uint32_t BALL_STATE_IN_SERVICE = 1;
 constexpr uint32_t BALL_STATE_TRAVELLING = 2;
 constexpr uint32_t BALL_STATE_FAILED_SERVICE = 3;
+constexpr uint32_t BALL_STATE_PASSING = 4;
 
 struct GameState {
   PhysicsState p1;

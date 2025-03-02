@@ -340,9 +340,12 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
              adjusted_ball_radius, WHITE);
 
-  DrawCircleLines((int)state.target.pos.x * w_ratio,
-                  (int)state.target.pos.y * h_ratio,
-                  (int)target_radius * 2 * h_ratio, WHITE);
+  // only if a player can target, display target
+  if (state.ball_state == BALL_STATE_IN_SERVICE) {
+    DrawCircleLines((int)state.target.pos.x * w_ratio,
+                    (int)state.target.pos.y * h_ratio,
+                    (int)target_radius * 2 * h_ratio, WHITE);
+  }
 
   // divider lines
   constexpr int num_lines = 6;

@@ -59,6 +59,38 @@ PhysicsState *playerFromIndex(GameState &state, int idx) {
   return paddle;
 }
 
+Vec3 centerOfOpposingCourt(int idx) {
+  Vec3 ret;
+  ret.z = 0;
+  ret.y = arena_height / 2.0;
+  switch (idx) {
+  case 0:
+  case 1:
+    ret.x = 3.0f * arena_width / 4.0f;
+    break;
+  case 2:
+  case 3:
+  default:
+    ret.x = arena_width / 4.0f;
+    break;
+  }
+  return ret;
+}
+
+uint32_t getTeammateIdx(int player_idx) {
+  switch (player_idx) {
+  case 0:
+    return 1;
+  case 1:
+    return 0;
+  case 2:
+    return 3;
+  default:
+  case 3:
+    return 3;
+  }
+}
+
 void resetGameState(GameState &state) {
   state.p1.vel.x = 0;
   state.p1.vel.y = 0;
@@ -95,17 +127,17 @@ void resetGameState(GameState &state) {
   state.target.pos.y = 0;
   state.target.pos.z = 0;
 
+  state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.ball_owner = 1;
+
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
   state.ball_speed = init_ball_speed;
   state.ball.vel.x = 0;
   state.ball.vel.y = 0;
   state.ball.vel.z = 0;
-  state.ball.pos.x = owning_player->pos.x;
-  state.ball.pos.y = owning_player->pos.y;
+  state.ball.pos.x = owning_player->pos.x + paddle_width;
+  state.ball.pos.y = owning_player->pos.y + (paddle_height / 2.0);
   state.ball.pos.z = 0;
-
-  state.ball_state = BALL_STATE_READY_TO_SERVE;
-  state.ball_owner = 1;
 
   state.timer = 0.0;
 
@@ -149,17 +181,17 @@ void resetRound(GameState &state) {
   state.target.pos.y = 0;
   state.target.pos.z = 0;
 
+  state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.ball_owner = 1; // FIXME: service rotation rules
+
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
   state.ball_speed = init_ball_speed;
   state.ball.vel.x = 0;
   state.ball.vel.y = 0;
   state.ball.vel.z = 0;
-  state.ball.pos.x = owning_player->pos.x;
-  state.ball.pos.y = owning_player->pos.y;
+  state.ball.pos.x = owning_player->pos.x + paddle_width;
+  state.ball.pos.y = owning_player->pos.y + paddle_height;
   state.ball.pos.z = 0;
-
-  state.ball_state = BALL_STATE_READY_TO_SERVE;
-  state.ball_owner = 1; // FIXME: service rotation rules
 
   state.timer = 0.0;
 }
@@ -211,10 +243,39 @@ void updatePlayerState(GameState &state, const InputMessage &input,
 
     // OWNER BALL STATE MACHINE
     if (state.ball_state == BALL_STATE_READY_TO_SERVE) {
+      // start serve
       if (input.jump) {
-        state.ball.vel.z = 0;
-        state.timer = 0;
         state.ball_state = BALL_STATE_IN_SERVICE;
+
+        // lock the ball to the player
+        state.ball.pos.x = paddle->pos.x + paddle_width;
+        state.ball.pos.y = paddle->pos.y + (paddle_height / 2.0);
+
+        // move the ball and player up
+        paddle->vel.z = ball_up_speed;
+        state.ball.vel.z = ball_up_speed;
+
+        // move the target to the center of the opposing court
+        state.target.pos = centerOfOpposingCourt(player);
+      }
+    } else if (state.ball_state == BALL_STATE_IN_SERVICE) {
+      // hit serve to the other side
+      if (state.timer > service_hittable_time && input.hit) {
+        state.ball_state = BALL_STATE_TRAVELLING;
+        Vec3 to_target = state.ball.pos - state.target.pos;
+        float magnitude = to_target.magnitude2D();
+        if (magnitude > 0.01) {
+          to_target.x /= magnitude;
+          to_target.y /= magnitude;
+        }
+        // speed = z_distance / t
+        // t = xy_distance / speed
+        // speed = state.ball_state.z / (xy_distance / speed)
+        to_target.z = -state.ball.pos.z / (magnitude / state.ball_speed);
+        to_target *= state.ball_speed;
+        state.ball.vel = to_target;
+        state.ball_owner = 0;
+        paddle->vel.z = -2 * ball_up_speed;
       }
     }
   } // END ball owner logic
@@ -242,8 +303,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
     }
 
     // normalize velocity
-    float magnitude = std::sqrt((paddle->vel.x * paddle->vel.x) +
-                                (paddle->vel.y * paddle->vel.y));
+    float magnitude = paddle->vel.magnitude2D();
     if (magnitude > 0.01) {
       paddle->vel.x = (paddle->vel.x / magnitude) * paddle_speed;
       paddle->vel.y = (paddle->vel.y / magnitude) * paddle_speed;
@@ -254,9 +314,28 @@ void updatePlayerState(GameState &state, const InputMessage &input,
 
     paddle->pos.y =
         std::clamp(paddle->pos.y, 0.0f, arena_height - paddle_height);
-    paddle->pos.z = std::max(0.0f, paddle->pos.z);
-  }
+
+    if (state.ball_state == BALL_STATE_TRAVELLING) {
+      // let the player pass the ball to their team-mate
+      // TODO: mechanism for blocking
+      if ((state.ball.pos - paddle->pos).magnitude2D() < ball_radius &&
+          input.hit) {
+        uint32_t teammate_idx = getTeammateIdx(player);
+        state.ball_state = BALL_STATE_PASSING;
+        state.ball_owner = teammate_idx;
+
+        PhysicsState *teammate = playerFromIndex(state, teammate_idx);
+        Vec3 to_target = state.ball.pos - teammate->pos;
+        float magnitude = to_target.magnitude2D();
+        if (magnitude > 0.01) {
+          to_target.x /= magnitude;
+          to_target.y /= magnitude;
+        }
+      }
+    }
+  } // END NON-OWNER LOGIC
   paddle->pos.z += paddle->vel.z * delta_time;
+  paddle->pos.z = std::max(0.0f, paddle->pos.z);
 }
 
 void updateGameState(GameState &state, double delta_time) {
@@ -278,29 +357,29 @@ void updateGameState(GameState &state, double delta_time) {
     PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
     state.timer += delta_time;
 
-    // lock the ball to the player
-    state.ball.pos.x = owning_player->pos.x;
-    state.ball.pos.y = owning_player->pos.y;
-
-    // move the ball and player up
-    owning_player->vel.z = ball_up_speed;
-    state.ball.vel.z = ball_up_speed;
-
     // if timer is too large, you fail service
     if (state.timer > service_max_time) {
       state.ball_state = BALL_STATE_FAILED_SERVICE;
     }
   } else if (state.ball_state == BALL_STATE_FAILED_SERVICE) {
+    // let the ball drop back down & then reset
     PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
     state.timer = 0;
     owning_player->vel.z = -2 * ball_up_speed;
     state.ball.vel.z = -2 * ball_up_speed;
-    if (state.ball.pos.z < 0) {
+    if (state.ball.pos.z <= 0) {
+      // TODO: make the owner lose a point
+      resetRound(state);
+    }
+  } else if (state.ball_state == BALL_STATE_TRAVELLING) {
+    // TODO: if we get to the target make the loser lose
+    if ((state.ball.pos - state.target.pos).magnitude2D() < target_radius) {
       resetRound(state);
     }
   }
 
-  // state.ball.pos.x += state.ball.vel.x * delta_time;
-  // state.ball.pos.y += state.ball.vel.y * delta_time;
+  state.ball.pos.x += state.ball.vel.x * delta_time;
+  state.ball.pos.y += state.ball.vel.y * delta_time;
   state.ball.pos.z += state.ball.vel.z * delta_time;
+  state.ball.pos.z = std::max(state.ball.pos.z, 0.0f);
 }
