@@ -17,7 +17,8 @@ constexpr float paddle_speed = 160.0;
 constexpr float target_speed = 160.0;
 constexpr float target_radius = 10.0;
 constexpr float ball_radius = 15.0;
-constexpr float init_ball_speed = 100.0;
+constexpr float hit_leeway = 3.0;
+constexpr float init_ball_speed = 200.0;
 constexpr float max_ball_speed = 300.0;
 constexpr float ball_up_speed = 50.0;
 constexpr float ball_speed_inc = 50.0;
@@ -25,6 +26,8 @@ constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
 constexpr float ball_max_passing_height = 30.0;
 constexpr float jump_height = 25.0;
+constexpr float passing_max_dist = 100.0;
+constexpr float passing_min_dist = -100.0;
 
 constexpr float service_hittable_time = 0.5;
 constexpr float service_max_time = 0.8;
@@ -105,25 +108,29 @@ struct GameState {
   PhysicsState p4;
   PhysicsState ball;
   PhysicsState target;
+  PhysicsState landing_zone;
   uint16_t team1_score = 0;
   uint16_t team2_score = 0;
   float ball_speed = 0.0;
   uint32_t tick = 0;
   uint32_t ball_state = BALL_STATE_READY_TO_SERVE;
   int16_t ball_owner = 1; // who is serving the ball right now 1-4; 0 -> no-one
+  bool can_owner_move = false;
   float timer = 0.0;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(p1, p2, p3, p4, ball, target, team1_score, team2_score, ball_speed,
-            tick, ball_state, ball_owner, timer);
+    archive(p1, p2, p3, p4, ball, target, landing_zone, team1_score,
+            team2_score, ball_speed, tick, ball_state, ball_owner,
+            can_owner_move, timer);
   }
 
   bool operator==(const GameState &c) {
     return p1 == c.p1 && p2 == c.p2 && p3 == c.p3 && p4 == c.p4 &&
            ball == c.ball && target == c.target &&
-           team1_score == c.team1_score && team2_score == c.team2_score &&
-           fcmp(ball_speed, c.ball_speed) && tick == c.tick &&
-           ball_state == c.ball_state && ball_owner == c.ball_owner &&
+           landing_zone == c.landing_zone && team1_score == c.team1_score &&
+           team2_score == c.team2_score && fcmp(ball_speed, c.ball_speed) &&
+           tick == c.tick && ball_state == c.ball_state &&
+           ball_owner == c.ball_owner && can_owner_move == c.can_owner_move &&
            fcmp(timer, c.timer);
   }
 
