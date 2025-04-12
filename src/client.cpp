@@ -28,6 +28,8 @@ constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
     std::make_pair(800, 450), std::make_pair(1280, 820),
     std::make_pair(1920, 1080), std::make_pair(2560, 1440)};
 
+static bool debug_mode = false;
+
 class Client {
 public:
   Client() = default;
@@ -312,6 +314,28 @@ InputMessage getInput(uint32_t tick) {
   return i;
 }
 
+void drawDebugOverlay(const GameState &state, double w_ratio, double h_ratio) {
+  char ball_state[20];
+  char ball_owner[20];
+  char timer[20];
+  char ball_physics[100];
+  snprintf(ball_state, 20, "ball_state: %d", state.ball_state);
+  snprintf(ball_owner, 20, "ball_owner: %d", state.ball_owner);
+  snprintf(timer, 20, "timer: %f", state.timer);
+  snprintf(ball_physics, 100, "ball z: %f, vx: %f, vy:%f, vz: %f",
+           state.ball.pos.z, state.ball.vel.x, state.ball.vel.y,
+           state.ball.vel.z);
+
+  DrawText(ball_state, (arena_width / 25) * w_ratio, 30 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(ball_owner, (arena_width / 25) * w_ratio, 40 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(timer, (arena_width / 25) * w_ratio, 50 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(ball_physics, 15 * (arena_width / 25) * w_ratio, 20 * h_ratio,
+           10 * h_ratio, YELLOW);
+}
+
 void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // game pieces
   DrawRectangle(
@@ -369,6 +393,10 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
            WHITE);
   DrawText(p2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio,
            80 * h_ratio, WHITE);
+
+  if (debug_mode) {
+    drawDebugOverlay(state, w_ratio, h_ratio);
+  }
 }
 
 void drawRoomState(const RoomState &state, double w_ratio, double h_ratio) {
@@ -394,6 +422,16 @@ public:
     SetTargetFPS(144);
     SetExitKey(0);
     client_.updateRoomList();
+  }
+
+  void join_room(uint16_t room) {
+    scene_ = SCENE_ROOM_SELECT;
+    client_.joinRoom(room);
+  }
+
+  void make_room() {
+    scene_ = SCENE_ROOM_SELECT;
+    client_.makeRoom();
   }
 
   void run() {
@@ -654,9 +692,44 @@ private:
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
+
+  // arg parsing for development
+  int curr_arg = 0;
+  int room_to_join = -1;
+  bool make_room = false;
+  while (++curr_arg != argc) {
+    if (strcmp(argv[curr_arg], "-c") == 0) {
+      make_room = true;
+    } else if (strcmp(argv[curr_arg], "-j") == 0) {
+      if (++curr_arg == argc) {
+        std::cerr << "error: specify room number to join" << std::endl;
+        return 1;
+      }
+      room_to_join = atoi(argv[curr_arg]);
+    } else if (strcmp(argv[curr_arg], "-d") == 0 ||
+               strcmp(argv[curr_arg], "--debug") == 0) {
+      debug_mode = true;
+    } else {
+      std::cerr << "unknown argument: " << argv[curr_arg] << std::endl;
+      return 1;
+    }
+  }
+
+  if (make_room && room_to_join != -1) {
+    std::cerr << "ERROR: you can't join and create a room at the same time. "
+                 "Please only pick -j or -c"
+              << std::endl;
+    return 1;
+  }
+
   Game game;
   game.start();
+  if (room_to_join != -1) {
+    game.join_room(room_to_join);
+  } else if (make_room) {
+    game.make_room();
+  }
   game.run();
   return 0;
 }
