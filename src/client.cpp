@@ -332,7 +332,7 @@ void drawDebugOverlay(const GameState &state, double w_ratio, double h_ratio) {
            YELLOW);
   DrawText(timer, (arena_width / 25) * w_ratio, 50 * h_ratio, 10 * h_ratio,
            YELLOW);
-  DrawText(ball_physics, 15 * (arena_width / 25) * w_ratio, 20 * h_ratio,
+  DrawText(ball_physics, 12 * (arena_width / 25) * w_ratio, 20 * h_ratio,
            10 * h_ratio, YELLOW);
 }
 
@@ -360,12 +360,13 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
       WHITE);
 
   int adjusted_ball_radius =
-      (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) * w_ratio;
+      (int)(ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) * w_ratio;
   DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
              adjusted_ball_radius, WHITE);
 
   // only if a player can target, display target
-  if (state.ball_state == BALL_STATE_IN_SERVICE) {
+  if (state.ball_state == BALL_STATE_IN_SERVICE ||
+      state.ball_state == BALL_STATE_PASSING) {
     DrawCircleLines((int)state.target.pos.x * w_ratio,
                     (int)state.target.pos.y * h_ratio,
                     (int)target_radius * 2 * h_ratio, WHITE);

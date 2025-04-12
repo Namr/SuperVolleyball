@@ -23,6 +23,7 @@ constexpr float ball_up_speed = 50.0;
 constexpr float ball_speed_inc = 50.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
+constexpr float ball_max_passing_height = 30.0;
 
 constexpr float service_hittable_time = 0.5;
 constexpr float service_max_time = 0.8;
