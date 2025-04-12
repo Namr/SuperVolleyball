@@ -311,7 +311,21 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         sendBallDownToTarget(state, state.target.pos);
         paddle->vel.z = -2 * ball_up_speed;
       }
-    } else if (state.ball_state == BALL_STATE_PASSING) {
+    } else if (state.ball_state == BALL_STATE_FIRST_PASS) {
+      if ((state.ball.pos - paddle->pos).magnitude2D() < ball_radius &&
+          input.hit) {
+        // hit to your teammate again
+        uint32_t teammate_idx = getTeammateIdx(player);
+        PhysicsState *teammate = playerFromIndex(state, teammate_idx);
+        state.ball_state = BALL_STATE_SECOND_PASS;
+        state.ball_owner = teammate_idx + 1; // ball_owner is 1 indexed
+        // TODO: add randomness to the pass
+        sendBallUpToTarget(state, teammate->pos);
+
+        // let your teammate aim
+        state.target.pos = centerOfOpposingCourt(player);
+      }
+    } else if (state.ball_state == BALL_STATE_SECOND_PASS) {
       // hit to the other side
       if ((state.ball.pos - paddle->pos).magnitude2D() < ball_radius &&
           input.hit) {
@@ -344,6 +358,14 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       paddle->vel.x = 0.0;
     }
 
+    if (paddle->pos.z >= ball_max_passing_height) {
+      paddle->vel.z = -ball_up_speed * 2;
+    }
+
+    if (input.jump && paddle->pos.z == 0.0) {
+      paddle->vel.z = ball_up_speed;
+    }
+
     // normalize velocity
     float magnitude = paddle->vel.magnitude2D();
     if (magnitude > 0.01) {
@@ -365,12 +387,13 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       }
 
       if ((state.ball.pos - paddle->pos).magnitude2D() < ball_radius &&
-          input.hit) {
+          input.hit && state.ball_owner != -player) {
         uint32_t teammate_idx = getTeammateIdx(player);
-        state.ball_state = BALL_STATE_PASSING;
+        state.ball_state = BALL_STATE_FIRST_PASS;
         state.ball_owner = teammate_idx + 1; // ball_owner is 1 indexed...
 
         PhysicsState *teammate = playerFromIndex(state, teammate_idx);
+        // TODO: there should be some randomness to this passing
         sendBallUpToTarget(state, teammate->pos);
 
         // let your teammate aim
@@ -423,8 +446,9 @@ void updateGameState(GameState &state, double delta_time) {
       givePlayerPoints(state, 1, -state.ball_owner);
       resetRound(state);
     }
-  } else if (state.ball_state == BALL_STATE_PASSING) {
-    if (state.ball.pos.z >= ball_max_passing_height) {
+  } else if (state.ball_state == BALL_STATE_FIRST_PASS ||
+             state.ball_state == BALL_STATE_SECOND_PASS) {
+    if (state.ball.vel.z > 0 && state.ball.pos.z >= ball_max_passing_height) {
       // go down
       state.ball.vel.z *= -0.75;
     } else {

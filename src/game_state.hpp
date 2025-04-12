@@ -24,6 +24,7 @@ constexpr float ball_speed_inc = 50.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
 constexpr float ball_max_passing_height = 30.0;
+constexpr float jump_height = 25.0;
 
 constexpr float service_hittable_time = 0.5;
 constexpr float service_max_time = 0.8;
@@ -94,7 +95,8 @@ constexpr uint32_t BALL_STATE_READY_TO_SERVE = 0;
 constexpr uint32_t BALL_STATE_IN_SERVICE = 1;
 constexpr uint32_t BALL_STATE_TRAVELLING = 2;
 constexpr uint32_t BALL_STATE_FAILED_SERVICE = 3;
-constexpr uint32_t BALL_STATE_PASSING = 4;
+constexpr uint32_t BALL_STATE_FIRST_PASS = 4;
+constexpr uint32_t BALL_STATE_SECOND_PASS = 5;
 
 struct GameState {
   PhysicsState p1;

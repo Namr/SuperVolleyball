@@ -366,7 +366,8 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
 
   // only if a player can target, display target
   if (state.ball_state == BALL_STATE_IN_SERVICE ||
-      state.ball_state == BALL_STATE_PASSING) {
+      state.ball_state == BALL_STATE_FIRST_PASS ||
+      state.ball_state == BALL_STATE_SECOND_PASS) {
     DrawCircleLines((int)state.target.pos.x * w_ratio,
                     (int)state.target.pos.y * h_ratio,
                     (int)target_radius * 2 * h_ratio, WHITE);
