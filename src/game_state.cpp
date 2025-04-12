@@ -268,11 +268,11 @@ void updatePlayerState(GameState &state, const InputMessage &input,
           to_target.x /= magnitude;
           to_target.y /= magnitude;
         }
-        // speed = z_distance / t
-        // t = xy_distance / speed
-        // speed = state.ball_state.z / (xy_distance / speed)
-        to_target.z = -state.ball.pos.z / (magnitude / state.ball_speed);
         to_target *= state.ball_speed;
+        // speed = z_distance / desired_time
+        // desired_time = xy_distance / xy_speed
+        // speed = state.ball_state.z / (xy_distance / xy_speed)
+        to_target.z = -state.ball.pos.z / (magnitude / state.ball_speed);
         state.ball.vel = to_target;
         state.ball_owner = 0;
         paddle->vel.z = -2 * ball_up_speed;
