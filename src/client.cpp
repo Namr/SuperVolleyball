@@ -385,14 +385,14 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   }
 
   // score
-  char p1_score[20];
-  char p2_score[20];
-  snprintf(p1_score, 20, "%d", state.p1_score);
-  snprintf(p2_score, 20, "%d", state.p2_score);
+  char team1_score[20];
+  char team2_score[20];
+  snprintf(team1_score, 20, "%d", state.team1_score);
+  snprintf(team2_score, 20, "%d", state.team2_score);
 
-  DrawText(p1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio,
+  DrawText(team1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio,
            WHITE);
-  DrawText(p2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio,
+  DrawText(team2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio,
            80 * h_ratio, WHITE);
 
   if (debug_mode) {

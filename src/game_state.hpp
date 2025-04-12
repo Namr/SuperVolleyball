@@ -103,25 +103,26 @@ struct GameState {
   PhysicsState p4;
   PhysicsState ball;
   PhysicsState target;
-  uint16_t p1_score = 0;
-  uint16_t p2_score = 0;
+  uint16_t team1_score = 0;
+  uint16_t team2_score = 0;
   float ball_speed = 0.0;
   uint32_t tick = 0;
   uint32_t ball_state = BALL_STATE_READY_TO_SERVE;
-  uint32_t ball_owner = 1; // who is serving the ball right now 1-4; 0 -> no-one
+  int16_t ball_owner = 1; // who is serving the ball right now 1-4; 0 -> no-one
   float timer = 0.0;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(p1, p2, p3, p4, ball, target, p1_score, p2_score, ball_speed, tick,
-            ball_state, ball_owner, timer);
+    archive(p1, p2, p3, p4, ball, target, team1_score, team2_score, ball_speed,
+            tick, ball_state, ball_owner, timer);
   }
 
   bool operator==(const GameState &c) {
     return p1 == c.p1 && p2 == c.p2 && p3 == c.p3 && p4 == c.p4 &&
-           ball == c.ball && target == c.target && p1_score == c.p1_score &&
-           p2_score == c.p2_score && fcmp(ball_speed, c.ball_speed) &&
-           tick == c.tick && ball_state == c.ball_state &&
-           ball_owner == c.ball_owner && fcmp(timer, c.timer);
+           ball == c.ball && target == c.target &&
+           team1_score == c.team1_score && team2_score == c.team2_score &&
+           fcmp(ball_speed, c.ball_speed) && tick == c.tick &&
+           ball_state == c.ball_state && ball_owner == c.ball_owner &&
+           fcmp(timer, c.timer);
   }
 
   bool operator!=(const GameState &c) { return !(*this == c); }
