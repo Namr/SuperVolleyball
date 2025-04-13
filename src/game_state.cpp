@@ -37,6 +37,7 @@ GameState interpolate(GameState &previous, GameState &next, double a) {
   ret.tick = previous.tick;
 
   ret.ball_state = previous.ball_state;
+  ret.last_server = previous.last_server;
   ret.ball_owner = previous.ball_owner;
   ret.can_owner_move = previous.can_owner_move;
   return ret;
@@ -206,6 +207,7 @@ void resetGameState(GameState &state) {
   state.landing_zone.pos.z = 0;
 
   state.ball_state = BALL_STATE_READY_TO_SERVE;
+  state.last_server = 1;
   state.ball_owner = 1;
   state.can_owner_move = false;
 
@@ -269,10 +271,11 @@ void resetRound(GameState &state) {
 
   state.ball_state = BALL_STATE_READY_TO_SERVE;
   // FIXME: correct service rotation rules
-  state.ball_owner += 1;
-  if (state.ball_owner > 3) {
-    state.ball_owner = 1;
+  state.last_server += 1;
+  if (state.last_server > 3) {
+    state.last_server = 1;
   }
+  state.ball_owner = state.last_server;
   state.can_owner_move = false;
 
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);

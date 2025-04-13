@@ -362,14 +362,14 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   int adjusted_ball_radius =
       (int)(ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) * w_ratio;
   DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
-             adjusted_ball_radius, WHITE);
+             adjusted_ball_radius, GREEN);
 
   // only if a player can target, display target
   if (state.ball_state == BALL_STATE_IN_SERVICE ||
       state.ball_state == BALL_STATE_SECOND_PASS) {
     DrawCircleLines((int)state.target.pos.x * w_ratio,
                     (int)state.target.pos.y * h_ratio,
-                    (int)target_radius * 2 * h_ratio, WHITE);
+                    (int)target_radius * 2 * h_ratio, BLUE);
   }
 
   // only on passes show the landing zone
