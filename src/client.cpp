@@ -26,6 +26,8 @@ constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
     std::make_pair(800, 450), std::make_pair(1280, 820),
     std::make_pair(1920, 1080), std::make_pair(2560, 1440)};
 
+static bool debug_mode = false;
+
 class Client {
 public:
   Client() = default;
@@ -124,11 +126,13 @@ public:
               if (game_state_msg.tick == p.first.tick) {
                 found_id = true;
                 if (game_state_msg != p.second) {
+                  /*
                   std::cout << "disagreement on tick: " << game_state_msg.tick;
                   std::cout << " ( " << game_state_msg.ball.pos.x << ", "
                             << game_state_msg.ball.pos.y << ") vs ";
                   std::cout << " ( " << p.second.ball.pos.x << ", "
                             << p.second.ball.pos.y << ")\n";
+                  */
                   is_recomputing = true;
                   p.second = game_state_msg;
                   running_gamestate = game_state_msg;
@@ -148,7 +152,8 @@ public:
           // if we outran our buffer ...?
           // FIXME: this can lead to a desync lol
           if (!found_id) {
-            std::cout << "we didn't find id: " << game_state_msg.tick << " and we're on id: " << game_state.tick << std::endl;
+            std::cout << "we didn't find id: " << game_state_msg.tick
+                      << " and we're on id: " << game_state.tick << std::endl;
           }
         }
       } else {
@@ -293,29 +298,91 @@ InputMessage getInput(uint32_t tick) {
   i.tick = tick;
   i.up = IsKeyDown(KEY_UP);
   i.down = IsKeyDown(KEY_DOWN);
+  i.left = IsKeyDown(KEY_LEFT);
+  i.right = IsKeyDown(KEY_RIGHT);
+
+  i.target_up = IsKeyDown(KEY_W);
+  i.target_down = IsKeyDown(KEY_S);
+  i.target_left = IsKeyDown(KEY_A);
+  i.target_right = IsKeyDown(KEY_D);
+
+  i.jump = IsKeyDown(KEY_SPACE);
+  i.hit = IsKeyDown(KEY_E);
+
   return i;
+}
+
+void drawDebugOverlay(const GameState &state, double w_ratio, double h_ratio) {
+  char ball_state[20];
+  char ball_owner[20];
+  char timer[20];
+  char ball_physics[100];
+  snprintf(ball_state, 20, "ball_state: %d", state.ball_state);
+  snprintf(ball_owner, 20, "ball_owner: %d", state.ball_owner);
+  snprintf(timer, 20, "timer: %f", state.timer);
+  snprintf(ball_physics, 100, "ball z: %f, vx: %f, vy:%f, vz: %f",
+           state.ball.pos.z, state.ball.vel.x, state.ball.vel.y,
+           state.ball.vel.z);
+
+  DrawText(ball_state, (arena_width / 25) * w_ratio, 30 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(ball_owner, (arena_width / 25) * w_ratio, 40 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(timer, (arena_width / 25) * w_ratio, 50 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(ball_physics, 12 * (arena_width / 25) * w_ratio, 20 * h_ratio,
+           10 * h_ratio, YELLOW);
 }
 
 void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   // game pieces
-  DrawRectangle((int)state.p1_paddle.pos.x * w_ratio,
-                (int)state.p1_paddle.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
-                WHITE);
-  DrawRectangle((int)state.p2_paddle.pos.x * w_ratio,
-                (int)state.p2_paddle.pos.y * h_ratio,
-                (int)paddle_width * w_ratio, (int)paddle_height * h_ratio,
-                WHITE);
+  DrawRectangle(
+      (int)state.p1.pos.x * w_ratio, (int)state.p1.pos.y * h_ratio,
+      (int)(paddle_width + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
+  DrawRectangle(
+      (int)state.p2.pos.x * w_ratio, (int)state.p2.pos.y * h_ratio,
+      (int)(paddle_width + (state.p2.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p2.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
+  DrawRectangle(
+      (int)state.p3.pos.x * w_ratio, (int)state.p3.pos.y * h_ratio,
+      (int)(paddle_width + (state.p3.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p3.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
+  DrawRectangle(
+      (int)state.p4.pos.x * w_ratio, (int)state.p4.pos.y * h_ratio,
+      (int)(paddle_width + (state.p4.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
+      (int)(paddle_height + (state.p4.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
+      WHITE);
 
-  DrawRectangle((int)(state.ball.pos.x - ball_radius) * w_ratio,
-                (int)(state.ball.pos.y - ball_radius) * h_ratio,
-                (int)ball_radius * 2 * w_ratio, (int)ball_radius * 2 * h_ratio,
-                WHITE);
+  int adjusted_ball_radius =
+      (int)(ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) * w_ratio;
+  DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
+             adjusted_ball_radius, GREEN);
+
+  // only if a player can target, display target
+  if (state.ball_state == BALL_STATE_IN_SERVICE ||
+      state.ball_state == BALL_STATE_SECOND_PASS) {
+    DrawCircleLines((int)state.target.pos.x * w_ratio,
+                    (int)state.target.pos.y * h_ratio,
+                    (int)target_radius * 2 * h_ratio, BLUE);
+  }
+
+  // only on passes show the landing zone
+  if (state.ball_state == BALL_STATE_FIRST_PASS ||
+      state.ball_state == BALL_STATE_SECOND_PASS ||
+      state.ball_state == BALL_STATE_TRAVELLING) {
+    DrawCircleLines((int)state.landing_zone.pos.x * w_ratio,
+                    (int)state.landing_zone.pos.y * h_ratio,
+                    (int)target_radius * 2 * h_ratio, YELLOW);
+  }
 
   // divider lines
   constexpr int num_lines = 6;
   const int space_between_divider = 30 * h_ratio;
-  const int rect_width = 10 * w_ratio;
+  const int rect_width = center_line_width * w_ratio;
   const int rect_spacing = ((arena_height * h_ratio) / num_lines);
   const int rect_height = rect_spacing - space_between_divider;
   for (int i = 0; i < num_lines; i++) {
@@ -325,26 +392,38 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   }
 
   // score
-  char p1_score[20];
-  char p2_score[20];
-  snprintf(p1_score, 20, "%d", state.p1_score);
-  snprintf(p2_score, 20, "%d", state.p2_score);
+  char team1_score[20];
+  char team2_score[20];
+  snprintf(team1_score, 20, "%d", state.team1_score);
+  snprintf(team2_score, 20, "%d", state.team2_score);
 
-  DrawText(p1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio,
+  DrawText(team1_score, (arena_width / 5) * w_ratio, 50 * h_ratio, 80 * h_ratio,
            WHITE);
-  DrawText(p2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio,
+  DrawText(team2_score, 4 * (arena_width / 5) * w_ratio, 50 * h_ratio,
            80 * h_ratio, WHITE);
+
+  if (debug_mode) {
+    drawDebugOverlay(state, w_ratio, h_ratio);
+  }
 }
 
 void drawRoomState(const RoomState &state, double w_ratio, double h_ratio) {
   char p1[40];
   char p2[40];
+  char p3[40];
+  char p4[40];
   snprintf(p1, 20, "%s %d ms", state.nicknames[0].c_str(), state.pings[0]);
   snprintf(p2, 20, "%s %d ms", state.nicknames[1].c_str(), state.pings[1]);
+  snprintf(p3, 20, "%s %d ms", state.nicknames[2].c_str(), state.pings[2]);
+  snprintf(p4, 20, "%s %d ms", state.nicknames[3].c_str(), state.pings[3]);
 
   DrawTextCentered(p1, (arena_width / 20) * w_ratio, 20 * h_ratio, 10 * h_ratio,
                    WHITE);
-  DrawTextCentered(p2, 19 * (arena_width / 20) * w_ratio, 20 * h_ratio,
+  DrawTextCentered(p2, (arena_width / 20) * w_ratio, 400 * h_ratio,
+                   10 * h_ratio, WHITE);
+  DrawTextCentered(p3, 19 * (arena_width / 20) * w_ratio, 20 * h_ratio,
+                   10 * h_ratio, WHITE);
+  DrawTextCentered(p4, 19 * (arena_width / 20) * w_ratio, 400 * h_ratio,
                    10 * h_ratio, WHITE);
 }
 
@@ -359,6 +438,16 @@ public:
     SetTargetFPS(144);
     SetExitKey(0);
     client_.updateRoomList();
+  }
+
+  void join_room(uint16_t room) {
+    scene_ = SCENE_ROOM_SELECT;
+    client_.joinRoom(room);
+  }
+
+  void make_room() {
+    scene_ = SCENE_ROOM_SELECT;
+    client_.makeRoom();
   }
 
   void run() {
@@ -490,7 +579,13 @@ private:
       scene_ = SCENE_MAIN_MENU;
       selection_ = 0;
       return;
+    } else if (IsKeyReleased(KEY_LEFT)) {
+      selection_--;
+    } else if (IsKeyReleased(KEY_RIGHT)) {
+      selection_++;
     }
+    selection_ =
+        std::clamp(selection_, (size_t)0, AVAILABLE_RESOLUTIONS.size() - 1);
 
     int old_horiz = horizontal_resolution_;
     int old_vert = vertical_resolution_;
@@ -504,8 +599,6 @@ private:
         old_vert != vertical_resolution_) {
       SetWindowSize(horizontal_resolution_, vertical_resolution_);
     }
-
-    handle_menu_movement(AVAILABLE_RESOLUTIONS.size() - 1);
   }
 
   void room_selection() {
@@ -575,15 +668,15 @@ private:
                      20 * h_ratio_, LIGHTGRAY);
     DrawTextCentered(room_members.c_str(), 400 * w_ratio_, 120 * h_ratio_,
                      20 * h_ratio_, LIGHTGRAY);
-  
-    if(client_.room_state) {
-      RoomState& room = *client_.room_state;
-      for(int i = 0; i < PLAYERS_PER_ROOM; i++) {
-        if(!room.nicknames[i].empty()) {
+
+    if (client_.room_state) {
+      RoomState &room = *client_.room_state;
+      for (int i = 0; i < PLAYERS_PER_ROOM; i++) {
+        if (!room.nicknames[i].empty()) {
           char p[40];
           snprintf(p, 20, "%s %d ms", room.nicknames[i].c_str(), room.pings[i]);
-          DrawTextCentered(p, 400 * w_ratio_, (160 + i*20) * h_ratio_,
-                       20 * h_ratio_, LIGHTGRAY);
+          DrawTextCentered(p, 400 * w_ratio_, (160 + i * 20) * h_ratio_,
+                           20 * h_ratio_, LIGHTGRAY);
         }
       }
     }
@@ -619,9 +712,44 @@ private:
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
+
+  // arg parsing for development
+  int curr_arg = 0;
+  int room_to_join = -1;
+  bool make_room = false;
+  while (++curr_arg != argc) {
+    if (strcmp(argv[curr_arg], "-c") == 0) {
+      make_room = true;
+    } else if (strcmp(argv[curr_arg], "-j") == 0) {
+      if (++curr_arg == argc) {
+        std::cerr << "error: specify room number to join" << std::endl;
+        return 1;
+      }
+      room_to_join = atoi(argv[curr_arg]);
+    } else if (strcmp(argv[curr_arg], "-d") == 0 ||
+               strcmp(argv[curr_arg], "--debug") == 0) {
+      debug_mode = true;
+    } else {
+      std::cerr << "unknown argument: " << argv[curr_arg] << std::endl;
+      return 1;
+    }
+  }
+
+  if (make_room && room_to_join != -1) {
+    std::cerr << "ERROR: you can't join and create a room at the same time. "
+                 "Please only pick -j or -c"
+              << std::endl;
+    return 1;
+  }
+
   Game game;
   game.start();
+  if (room_to_join != -1) {
+    game.join_room(room_to_join);
+  } else if (make_room) {
+    game.make_room();
+  }
   game.run();
   return 0;
 }
