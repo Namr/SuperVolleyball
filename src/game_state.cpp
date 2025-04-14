@@ -429,7 +429,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
     } else if (state.ball_state == BALL_STATE_FIRST_PASS) {
       if ((state.ball.pos - paddle->pos).magnitude2D() <
               (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
-                  hit_leeway &&
+                  hit_leeway + paddle_width &&
           input.hit) {
         // hit to your teammate again
         uint32_t teammate_idx = getTeammateIdx(player);
@@ -451,7 +451,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       // hit to the other side
       if ((state.ball.pos - paddle->pos).magnitude2D() <
               (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
-                  hit_leeway &&
+                  hit_leeway + paddle_width &&
           input.hit) {
         state.ball_state = BALL_STATE_TRAVELLING;
         state.ball_owner = -player; // negative values denote prev owner
@@ -469,7 +469,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
 
       if ((state.ball.pos - paddle->pos).magnitude2D() <
               (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
-                  hit_leeway &&
+                  hit_leeway + paddle_width &&
           input.hit && state.ball_owner != -player) {
         uint32_t teammate_idx = getTeammateIdx(player);
         state.ball_state = BALL_STATE_FIRST_PASS;

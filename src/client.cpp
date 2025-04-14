@@ -409,12 +409,20 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
 void drawRoomState(const RoomState &state, double w_ratio, double h_ratio) {
   char p1[40];
   char p2[40];
+  char p3[40];
+  char p4[40];
   snprintf(p1, 20, "%s %d ms", state.nicknames[0].c_str(), state.pings[0]);
   snprintf(p2, 20, "%s %d ms", state.nicknames[1].c_str(), state.pings[1]);
+  snprintf(p3, 20, "%s %d ms", state.nicknames[2].c_str(), state.pings[2]);
+  snprintf(p4, 20, "%s %d ms", state.nicknames[3].c_str(), state.pings[3]);
 
   DrawTextCentered(p1, (arena_width / 20) * w_ratio, 20 * h_ratio, 10 * h_ratio,
                    WHITE);
-  DrawTextCentered(p2, 19 * (arena_width / 20) * w_ratio, 20 * h_ratio,
+  DrawTextCentered(p2, (arena_width / 20) * w_ratio, 400 * h_ratio,
+                   10 * h_ratio, WHITE);
+  DrawTextCentered(p3, 19 * (arena_width / 20) * w_ratio, 20 * h_ratio,
+                   10 * h_ratio, WHITE);
+  DrawTextCentered(p4, 19 * (arena_width / 20) * w_ratio, 400 * h_ratio,
                    10 * h_ratio, WHITE);
 }
 
@@ -570,7 +578,13 @@ private:
       scene_ = SCENE_MAIN_MENU;
       selection_ = 0;
       return;
+    } else if (IsKeyReleased(KEY_LEFT)) {
+      selection_--;
+    } else if (IsKeyReleased(KEY_RIGHT)) {
+      selection_++;
     }
+    selection_ =
+        std::clamp(selection_, (size_t)0, AVAILABLE_RESOLUTIONS.size() - 1);
 
     int old_horiz = horizontal_resolution_;
     int old_vert = vertical_resolution_;
@@ -584,8 +598,6 @@ private:
         old_vert != vertical_resolution_) {
       SetWindowSize(horizontal_resolution_, vertical_resolution_);
     }
-
-    handle_menu_movement(AVAILABLE_RESOLUTIONS.size() - 1);
   }
 
   void room_selection() {
