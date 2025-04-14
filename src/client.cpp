@@ -22,8 +22,6 @@ constexpr int SCENE_SETTINGS = 2;
 constexpr int SCENE_SET_NAME = 3;
 constexpr uint16_t NICKNAME_MAX_LENGTH = 6;
 
-constexpr float Z_TO_SIZE_RATIO = 0.3;
-
 constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
     std::make_pair(800, 450), std::make_pair(1280, 820),
     std::make_pair(1920, 1080), std::make_pair(2560, 1440)};

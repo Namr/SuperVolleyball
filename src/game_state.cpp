@@ -33,7 +33,6 @@ GameState interpolate(GameState &previous, GameState &next, double a) {
   // things that should just snap to previous
   ret.team1_score = previous.team1_score;
   ret.team2_score = previous.team2_score;
-  ret.ball_speed = previous.ball_speed;
   ret.tick = previous.tick;
 
   ret.ball_state = previous.ball_state;
@@ -66,29 +65,46 @@ PhysicsState *playerFromIndex(GameState &state, int idx) {
 // speed = z_distance / desired_time
 // desired_time = xy_distance / xy_speed
 // speed = state.ball_state.z / (xy_distance / xy_speed)
-void sendBallDownToTarget(GameState &state, const Vec3 target) {
+void sendBallDownToTarget(GameState &state, const Vec3 &target,
+                          const float speed) {
   Vec3 to_target = state.ball.pos - target;
   float magnitude = to_target.magnitude2D();
   if (magnitude > 0.01) {
     to_target.x /= magnitude;
     to_target.y /= magnitude;
   }
-  to_target *= state.ball_speed;
-  to_target.z = -state.ball.pos.z / (magnitude / state.ball_speed);
+  to_target *= speed;
+  to_target.z = -state.ball.pos.z / (magnitude / speed);
   state.ball.vel = to_target;
 }
 
-void sendBallUpToTarget(GameState &state, const Vec3 target) {
+void passBallToTarget(GameState &state, const Vec3 &target) {
   Vec3 to_target = state.ball.pos - target;
   float magnitude = to_target.magnitude2D();
   if (magnitude > 0.01) {
     to_target.x /= magnitude;
     to_target.y /= magnitude;
   }
-  to_target *= state.ball_speed;
-  to_target.z =
-      (ball_max_passing_height / (magnitude / state.ball_speed)) * 2.0;
-  state.ball.pos.z = 0.3;
+  float desired_xy_speed = magnitude / ball_passing_time;
+  float desired_z_speed = (ball_max_passing_height / ball_passing_time) * 2.0;
+  to_target.x *= desired_xy_speed;
+  to_target.y *= desired_xy_speed;
+  to_target.z = desired_z_speed;
+  state.ball.pos.z = 0.01;
+  state.ball.vel = to_target;
+}
+
+void sendBallUpToTarget(GameState &state, const Vec3 &target,
+                        const float speed) {
+  Vec3 to_target = state.ball.pos - target;
+  float magnitude = to_target.magnitude2D();
+  if (magnitude > 0.01) {
+    to_target.x /= magnitude;
+    to_target.y /= magnitude;
+  }
+  to_target *= speed;
+  to_target.z = (ball_max_passing_height / (magnitude / speed)) * 2.0;
+  state.ball.pos.z = 0.01;
   state.ball.vel = to_target;
 }
 
@@ -212,7 +228,6 @@ void resetGameState(GameState &state) {
   state.can_owner_move = false;
 
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
-  state.ball_speed = init_ball_speed;
   state.ball.vel.x = 0;
   state.ball.vel.y = 0;
   state.ball.vel.z = 0;
@@ -279,7 +294,6 @@ void resetRound(GameState &state) {
   state.can_owner_move = false;
 
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
-  state.ball_speed = init_ball_speed;
   state.ball.vel.x = 0;
   state.ball.vel.y = 0;
   state.ball.vel.z = 0;
@@ -409,12 +423,13 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball_state = BALL_STATE_TRAVELLING;
         state.ball_owner = -player; // negative values denote prev owner
         state.can_owner_move = true;
-        sendBallDownToTarget(state, state.target.pos);
+        sendBallDownToTarget(state, state.target.pos, ball_shooting_speed);
         paddle->vel.z = -2 * ball_up_speed;
       }
     } else if (state.ball_state == BALL_STATE_FIRST_PASS) {
       if ((state.ball.pos - paddle->pos).magnitude2D() <
-              ball_radius + hit_leeway &&
+              (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
+                  hit_leeway &&
           input.hit) {
         // hit to your teammate again
         uint32_t teammate_idx = getTeammateIdx(player);
@@ -425,20 +440,22 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         Vec3 pass_target =
             movePositionRandomly(teammate->pos, passing_min_dist,
                                  passing_max_dist, state.tick, player);
-        sendBallUpToTarget(state, pass_target);
+        passBallToTarget(state, pass_target);
         state.landing_zone.pos = pass_target;
 
         // let your teammate aim
         state.target.pos = centerOfOpposingCourt(player);
       }
     } else if (state.ball_state == BALL_STATE_SECOND_PASS) {
+      // TODO: this should really be a spike
       // hit to the other side
       if ((state.ball.pos - paddle->pos).magnitude2D() <
-              ball_radius + hit_leeway &&
+              (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
+                  hit_leeway &&
           input.hit) {
         state.ball_state = BALL_STATE_TRAVELLING;
         state.ball_owner = -player; // negative values denote prev owner
-        sendBallUpToTarget(state, state.target.pos);
+        sendBallUpToTarget(state, state.target.pos, ball_shooting_speed);
       }
     }
   } // END ball owner logic
@@ -451,7 +468,8 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       }
 
       if ((state.ball.pos - paddle->pos).magnitude2D() <
-              ball_radius + hit_leeway &&
+              (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
+                  hit_leeway &&
           input.hit && state.ball_owner != -player) {
         uint32_t teammate_idx = getTeammateIdx(player);
         state.ball_state = BALL_STATE_FIRST_PASS;
@@ -462,7 +480,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         Vec3 pass_target =
             movePositionRandomly(teammate->pos, passing_min_dist,
                                  passing_max_dist, state.tick, player);
-        sendBallUpToTarget(state, pass_target);
+        passBallToTarget(state, pass_target);
         state.landing_zone.pos = pass_target;
       }
     }
@@ -516,7 +534,7 @@ void updateGameState(GameState &state, double delta_time) {
              state.ball_state == BALL_STATE_SECOND_PASS) {
     if (state.ball.vel.z > 0 && state.ball.pos.z >= ball_max_passing_height) {
       // go down
-      state.ball.vel.z *= -0.75;
+      state.ball.vel.z *= -0.95;
     } else {
       // if we hit the ground when passing, game over
       if (state.ball.pos.z <= 0) {
