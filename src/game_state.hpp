@@ -13,12 +13,12 @@ constexpr float arena_height = 450.0;
 constexpr float paddle_width = 25.0;
 constexpr float paddle_height = 25.0;
 constexpr float starting_dist_from_screen = 20.0;
-constexpr float paddle_speed = 160.0;
+constexpr float paddle_speed = 140.0;
 constexpr float target_speed = 250.0;
 constexpr float target_radius = 10.0;
 constexpr float ball_radius = 15.0;
 constexpr float hit_leeway = -0.1;
-constexpr float ball_shooting_speed = 150.0;
+constexpr float ball_shooting_speed = 250.0;
 constexpr float ball_up_speed = 20.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
@@ -31,6 +31,7 @@ constexpr float passing_min_dist = -100.0;
 constexpr float service_hittable_time = 0.5;
 constexpr float service_max_time = 2.5;
 constexpr float ball_passing_time = 2.5;
+constexpr float game_over_grace_period = 0.5;
 
 constexpr double EPSILON = 0.8;
 
@@ -103,6 +104,7 @@ constexpr uint32_t BALL_STATE_TRAVELLING = 2;
 constexpr uint32_t BALL_STATE_FAILED_SERVICE = 3;
 constexpr uint32_t BALL_STATE_FIRST_PASS = 4;
 constexpr uint32_t BALL_STATE_SECOND_PASS = 5;
+constexpr uint32_t BALL_STATE_GAME_OVER = 6;
 
 struct GameState {
   PhysicsState p1;
@@ -114,6 +116,9 @@ struct GameState {
   PhysicsState landing_zone;
   uint16_t team1_score = 0;
   uint16_t team2_score = 0;
+  uint16_t team1_points_to_give =
+      0; // dumb but this way the score doesn't update right away
+  uint16_t team2_points_to_give = 0;
   uint32_t tick = 0;
   uint32_t ball_state = BALL_STATE_READY_TO_SERVE;
   uint8_t last_server = 1;
@@ -123,15 +128,17 @@ struct GameState {
 
   template <class Archive> void serialize(Archive &archive) {
     archive(p1, p2, p3, p4, ball, target, landing_zone, team1_score,
-            team2_score, tick, ball_state, last_server, ball_owner,
-            can_owner_move, timer);
+            team2_score, team1_points_to_give, team2_points_to_give, tick,
+            ball_state, last_server, ball_owner, can_owner_move, timer);
   }
 
   bool operator==(const GameState &c) {
     return p1 == c.p1 && p2 == c.p2 && p3 == c.p3 && p4 == c.p4 &&
            ball == c.ball && target == c.target &&
            landing_zone == c.landing_zone && team1_score == c.team1_score &&
-           team2_score == c.team2_score && tick == c.tick &&
+           team2_score == c.team2_score &&
+           team1_points_to_give == c.team1_points_to_give &&
+           team2_points_to_give == c.team2_points_to_give && tick == c.tick &&
            ball_state == c.ball_state && last_server == c.last_server &&
            ball_owner == c.ball_owner && can_owner_move == c.can_owner_move &&
            fcmp(timer, c.timer);

@@ -33,6 +33,8 @@ GameState interpolate(GameState &previous, GameState &next, double a) {
   // things that should just snap to previous
   ret.team1_score = previous.team1_score;
   ret.team2_score = previous.team2_score;
+  ret.team1_points_to_give = previous.team1_points_to_give;
+  ret.team2_points_to_give = previous.team2_points_to_give;
   ret.tick = previous.tick;
 
   ret.ball_state = previous.ball_state;
@@ -142,17 +144,17 @@ uint32_t getTeammateIdx(int player_idx) {
 
 void giveOpponentPoints(GameState &state, int points, int player_idx) {
   if (player_idx == 0 || player_idx == 1) {
-    state.team2_score += points;
+    state.team2_points_to_give += points;
   } else {
-    state.team1_score += points;
+    state.team1_points_to_give += points;
   }
 }
 
 void givePlayerPoints(GameState &state, int points, int player_idx) {
   if (player_idx == 0 || player_idx == 1) {
-    state.team1_score += points;
+    state.team1_points_to_give += points;
   } else {
-    state.team2_score += points;
+    state.team2_points_to_give += points;
   }
 }
 
@@ -239,6 +241,8 @@ void resetGameState(GameState &state) {
 
   state.team1_score = 0;
   state.team2_score = 0;
+  state.team1_points_to_give = 0;
+  state.team2_points_to_give = 0;
 }
 
 void resetRound(GameState &state) {
@@ -302,6 +306,9 @@ void resetRound(GameState &state) {
   state.ball.pos.z = 0;
 
   state.timer = 0.0;
+
+  state.team1_points_to_give = 0;
+  state.team2_points_to_give = 0;
 }
 
 void updatePlayerState(GameState &state, const InputMessage &input,
@@ -423,6 +430,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball_state = BALL_STATE_TRAVELLING;
         state.ball_owner = -player; // negative values denote prev owner
         state.can_owner_move = true;
+        state.landing_zone.pos = state.target.pos;
         sendBallDownToTarget(state, state.target.pos, ball_shooting_speed);
         paddle->vel.z = -2 * ball_up_speed;
       }
@@ -455,6 +463,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
           input.hit) {
         state.ball_state = BALL_STATE_TRAVELLING;
         state.ball_owner = -player; // negative values denote prev owner
+        state.landing_zone.pos = state.target.pos;
         sendBallUpToTarget(state, state.target.pos, ball_shooting_speed);
       }
     }
@@ -521,14 +530,16 @@ void updateGameState(GameState &state, double delta_time) {
     if (state.ball.pos.z <= 0) {
       // make the owner lose a point
       giveOpponentPoints(state, 1, state.ball_owner - 1);
-      resetRound(state);
+      state.ball_state = BALL_STATE_GAME_OVER;
+      state.timer = 0;
     }
   } else if (state.ball_state == BALL_STATE_TRAVELLING) {
     // if we get to the target make the loser lose
     if ((state.ball.pos - state.target.pos).magnitude2D() < target_radius) {
       // negative values of ball_owner denote previous owner
       givePlayerPoints(state, 1, -state.ball_owner);
-      resetRound(state);
+      state.ball_state = BALL_STATE_GAME_OVER;
+      state.timer = 0;
     }
   } else if (state.ball_state == BALL_STATE_FIRST_PASS ||
              state.ball_state == BALL_STATE_SECOND_PASS) {
@@ -540,8 +551,14 @@ void updateGameState(GameState &state, double delta_time) {
       if (state.ball.pos.z <= 0) {
         // make the owner lose a point
         giveOpponentPoints(state, 1, state.ball_owner - 1);
-        resetRound(state);
+        state.ball_state = BALL_STATE_GAME_OVER;
+        state.timer = 0;
       }
+    }
+  } else if (state.ball_state == BALL_STATE_GAME_OVER) {
+    state.timer += delta_time;
+    if (state.timer > game_over_grace_period) {
+      resetRound(state);
     }
   }
 

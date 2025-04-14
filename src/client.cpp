@@ -372,7 +372,8 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
 
   // only on passes show the landing zone
   if (state.ball_state == BALL_STATE_FIRST_PASS ||
-      state.ball_state == BALL_STATE_SECOND_PASS) {
+      state.ball_state == BALL_STATE_SECOND_PASS ||
+      state.ball_state == BALL_STATE_TRAVELLING) {
     DrawCircleLines((int)state.landing_zone.pos.x * w_ratio,
                     (int)state.landing_zone.pos.y * h_ratio,
                     (int)target_radius * 2 * h_ratio, YELLOW);
