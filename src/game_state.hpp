@@ -18,15 +18,19 @@ constexpr float target_speed = 250.0;
 constexpr float target_radius = 10.0;
 constexpr float ball_radius = 15.0;
 constexpr float hit_leeway = -0.1;
+constexpr float ball_serving_speed = 400.0;
 constexpr float ball_shooting_speed = 250.0;
+constexpr float ball_spiking_speed = 600.0;
 constexpr float ball_up_speed = 20.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
 constexpr float ball_max_passing_height = 30.0;
+constexpr float jump_speed = 130.0;
 constexpr float jump_height = 25.0;
 constexpr float passing_max_dist = 100.0;
 constexpr float passing_min_dist = -100.0;
-constexpr float hitting_max_z_dist = 3.0;
+constexpr float hitting_max_z_dist = 6.0;
+constexpr float spiking_min_player_z = 6.0;
 
 // all in seconds
 constexpr float service_hittable_time = 0.5;

@@ -184,9 +184,12 @@ Vec3 movePositionRandomly(const Vec3 &pos, float min, float max, uint32_t tick,
 
 bool playerBallInCollision(const Vec3 &ball_pos, const Vec3 &player_pos) {
   return (ball_pos - player_pos).magnitude2D() <
-             (ball_radius + (ball_pos.z * Z_TO_SIZE_RATIO)) + hit_leeway +
-                 paddle_width &&
-         std::abs(ball_pos.z - player_pos.z) < hitting_max_z_dist;
+         (ball_radius + (ball_pos.z * Z_TO_SIZE_RATIO)) + hit_leeway +
+             paddle_width;
+}
+
+bool playerCanReachUpToBall(const Vec3 &ball_pos, const Vec3 &player_pos) {
+  return std::abs(ball_pos.z - player_pos.z) < hitting_max_z_dist;
 }
 
 void resetGameState(GameState &state) {
@@ -350,12 +353,12 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       paddle->vel.x = 0.0;
     }
 
-    if (paddle->pos.z >= ball_max_passing_height) {
-      paddle->vel.z = -ball_up_speed * 2;
+    if (paddle->pos.z >= jump_height) {
+      paddle->vel.z = -jump_speed / 1.5;
     }
 
     if (input.jump && paddle->pos.z == 0.0) {
-      paddle->vel.z = ball_up_speed;
+      paddle->vel.z = jump_speed;
     }
 
     // normalize velocity
@@ -448,11 +451,12 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball_owner = -player; // negative values denote prev owner
         state.can_owner_move = true;
         state.landing_zone.pos = state.target.pos;
-        sendBallDownToTarget(state, state.target.pos, ball_shooting_speed);
+        sendBallDownToTarget(state, state.target.pos, ball_serving_speed);
         paddle->vel.z = -2 * ball_up_speed;
       }
     } else if (state.ball_state == BALL_STATE_FIRST_PASS) {
-      if (playerBallInCollision(state.ball.pos, paddle->pos) && input.hit) {
+      if (playerBallInCollision(state.ball.pos, paddle->pos) &&
+          playerCanReachUpToBall(state.ball.pos, paddle->pos) && input.hit) {
         // hit to your teammate again
         uint32_t teammate_idx = getTeammateIdx(player);
         PhysicsState *teammate = playerFromIndex(state, teammate_idx);
@@ -469,13 +473,18 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.target.pos = centerOfOpposingCourt(player);
       }
     } else if (state.ball_state == BALL_STATE_SECOND_PASS) {
-      // TODO: this should really be a spike
-      // hit to the other side
       if (playerBallInCollision(state.ball.pos, paddle->pos) && input.hit) {
-        state.ball_state = BALL_STATE_TRAVELLING;
-        state.ball_owner = -player; // negative values denote prev owner
-        state.landing_zone.pos = state.target.pos;
-        sendBallUpToTarget(state, state.target.pos, ball_shooting_speed);
+        if (paddle->pos.z > spiking_min_player_z) {
+          state.ball_state = BALL_STATE_TRAVELLING;
+          state.ball_owner = -player; // negative values denote prev owner
+          state.landing_zone.pos = state.target.pos;
+          sendBallDownToTarget(state, state.target.pos, ball_spiking_speed);
+        } else if (playerCanReachUpToBall(state.ball.pos, paddle->pos)) {
+          state.ball_state = BALL_STATE_TRAVELLING;
+          state.ball_owner = -player; // negative values denote prev owner
+          state.landing_zone.pos = state.target.pos;
+          sendBallUpToTarget(state, state.target.pos, ball_shooting_speed);
+        }
       }
     }
   } // END ball owner logic
