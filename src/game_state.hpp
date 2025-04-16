@@ -26,6 +26,7 @@ constexpr float ball_max_passing_height = 30.0;
 constexpr float jump_height = 25.0;
 constexpr float passing_max_dist = 100.0;
 constexpr float passing_min_dist = -100.0;
+constexpr float hitting_max_z_dist = 3.0;
 
 // all in seconds
 constexpr float service_hittable_time = 0.5;
@@ -54,7 +55,7 @@ struct Vec3 {
     return fcmp(x, c.x) && fcmp(y, c.y) && fcmp(z, c.z);
   }
 
-  Vec3 operator+(const Vec3 &c) {
+  Vec3 operator+(const Vec3 &c) const {
     Vec3 ret;
     ret.x = c.x + x;
     ret.y = c.y + y;
@@ -62,7 +63,7 @@ struct Vec3 {
     return ret;
   }
 
-  Vec3 operator-(const Vec3 &c) {
+  Vec3 operator-(const Vec3 &c) const {
     Vec3 ret;
     ret.x = c.x - x;
     ret.y = c.y - y;
@@ -70,7 +71,7 @@ struct Vec3 {
     return ret;
   }
 
-  Vec3 operator*(const float c) {
+  Vec3 operator*(const float c) const {
     Vec3 ret = *this;
     ret.x *= c;
     ret.y *= c;

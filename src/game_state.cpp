@@ -181,6 +181,14 @@ Vec3 movePositionRandomly(const Vec3 &pos, float min, float max, uint32_t tick,
   pass_target.y = std::clamp(pass_target.y, 0.0f, arena_height - paddle_height);
   return pass_target;
 }
+
+bool playerBallInCollision(const Vec3 &ball_pos, const Vec3 &player_pos) {
+  return (ball_pos - player_pos).magnitude2D() <
+             (ball_radius + (ball_pos.z * Z_TO_SIZE_RATIO)) + hit_leeway +
+                 paddle_width &&
+         std::abs(ball_pos.z - player_pos.z) < hitting_max_z_dist;
+}
+
 void resetGameState(GameState &state) {
   state.p1.vel.x = 0;
   state.p1.vel.y = 0;
@@ -444,10 +452,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         paddle->vel.z = -2 * ball_up_speed;
       }
     } else if (state.ball_state == BALL_STATE_FIRST_PASS) {
-      if ((state.ball.pos - paddle->pos).magnitude2D() <
-              (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
-                  hit_leeway + paddle_width &&
-          input.hit) {
+      if (playerBallInCollision(state.ball.pos, paddle->pos) && input.hit) {
         // hit to your teammate again
         uint32_t teammate_idx = getTeammateIdx(player);
         PhysicsState *teammate = playerFromIndex(state, teammate_idx);
@@ -466,10 +471,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
     } else if (state.ball_state == BALL_STATE_SECOND_PASS) {
       // TODO: this should really be a spike
       // hit to the other side
-      if ((state.ball.pos - paddle->pos).magnitude2D() <
-              (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
-                  hit_leeway + paddle_width &&
-          input.hit) {
+      if (playerBallInCollision(state.ball.pos, paddle->pos) && input.hit) {
         state.ball_state = BALL_STATE_TRAVELLING;
         state.ball_owner = -player; // negative values denote prev owner
         state.landing_zone.pos = state.target.pos;
@@ -485,10 +487,9 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball.vel.z *= -1;
       }
 
-      if ((state.ball.pos - paddle->pos).magnitude2D() <
-              (ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) +
-                  hit_leeway + paddle_width &&
-          input.hit && state.ball_owner != -player) {
+      if (playerBallInCollision(state.ball.pos, paddle->pos) && input.hit &&
+          state.ball_owner != -player &&
+          state.ball_owner != -getTeammateIdx(player)) {
         uint32_t teammate_idx = getTeammateIdx(player);
         state.ball_state = BALL_STATE_FIRST_PASS;
         state.ball_owner = teammate_idx + 1; // ball_owner is 1 indexed...
