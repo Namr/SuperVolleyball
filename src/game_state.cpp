@@ -307,6 +307,8 @@ void resetRound(GameState &state) {
 
   state.timer = 0.0;
 
+  state.team1_score += state.team1_points_to_give;
+  state.team2_score += state.team2_points_to_give;
   state.team1_points_to_give = 0;
   state.team2_points_to_give = 0;
 }
@@ -365,6 +367,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
   // target movement code
   if (is_owner && (state.ball_state == BALL_STATE_IN_SERVICE ||
                    state.ball_state == BALL_STATE_SECOND_PASS)) {
+
     if (input.target_up) {
       state.target.vel.y = -target_speed;
     }
@@ -398,8 +401,14 @@ void updatePlayerState(GameState &state, const InputMessage &input,
     state.target.pos.x += state.target.vel.x * delta_time;
     state.target.pos.y += state.target.vel.y * delta_time;
 
-    state.target.pos.x =
-        std::clamp(state.target.pos.x, 0.0f, arena_width - target_radius);
+    if (player == 0 || player == 1) {
+      state.target.pos.x = std::clamp(state.target.pos.x,
+                                      (arena_width / 2.0f) + center_line_width,
+                                      arena_width - paddle_width);
+    } else {
+      state.target.pos.x = std::clamp(state.target.pos.x, 0.0f,
+                                      arena_width / 2.0f - paddle_width);
+    }
     state.target.pos.y =
         std::clamp(state.target.pos.y, 0.0f, arena_height - target_radius);
     state.target.pos.z = std::max(0.0f, state.target.pos.z);
