@@ -170,7 +170,8 @@ Vec3 movePositionRandomly(const Vec3 &pos, float min, float max, uint32_t tick,
   pass_target.x += dx;
   pass_target.y += dy;
 
-  if (player_idx == 0 || player_idx == 1) {
+  if (player_idx == 0 || player_idx == 1 || player_idx == -2 ||
+      player_idx == -3) {
     pass_target.x =
         std::clamp(pass_target.x, 0.0f, arena_width / 2.0f - paddle_width);
   } else {
@@ -480,6 +481,14 @@ void updatePlayerState(GameState &state, const InputMessage &input,
           state.landing_zone.pos = state.target.pos;
           sendBallDownToTarget(state, state.target.pos, ball_spiking_speed);
         } else if (playerCanReachUpToBall(state.ball.pos, paddle->pos)) {
+          // if you just bump the ball instead of spiking it,
+          // we incur a random aim penalty
+
+          // garbage hack to allow movePositionRandomly to bounds check properly
+          int tmp_player = player == 0 ? -1 : -player;
+          state.target.pos =
+              movePositionRandomly(state.target.pos, bumping_xy_penalty,
+                                   -bumping_xy_penalty, state.tick, tmp_player);
           state.ball_state = BALL_STATE_TRAVELLING;
           state.ball_owner = -player; // negative values denote prev owner
           state.landing_zone.pos = state.target.pos;

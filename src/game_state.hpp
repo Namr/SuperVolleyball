@@ -13,7 +13,7 @@ constexpr float arena_height = 450.0;
 constexpr float paddle_width = 25.0;
 constexpr float paddle_height = 25.0;
 constexpr float starting_dist_from_screen = 20.0;
-constexpr float paddle_speed = 140.0;
+constexpr float paddle_speed = 165.0;
 constexpr float target_speed = 250.0;
 constexpr float target_radius = 10.0;
 constexpr float ball_radius = 15.0;
@@ -31,6 +31,7 @@ constexpr float passing_max_dist = 100.0;
 constexpr float passing_min_dist = -100.0;
 constexpr float hitting_max_z_dist = 6.0;
 constexpr float spiking_min_player_z = 6.0;
+constexpr float bumping_xy_penalty = 70.0;
 
 // all in seconds
 constexpr float service_hittable_time = 0.5;
