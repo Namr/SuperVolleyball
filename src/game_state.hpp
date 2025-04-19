@@ -13,14 +13,15 @@ constexpr float arena_height = 450.0;
 constexpr float paddle_width = 25.0;
 constexpr float paddle_height = 25.0;
 constexpr float starting_dist_from_screen = 20.0;
-constexpr float paddle_speed = 165.0;
-constexpr float target_speed = 250.0;
+constexpr float paddle_speed = 195.0;
+constexpr float target_speed = 225.0;
 constexpr float target_radius = 10.0;
 constexpr float ball_radius = 15.0;
 constexpr float hit_leeway = -0.1;
 constexpr float ball_serving_speed = 400.0;
 constexpr float ball_shooting_speed = 250.0;
-constexpr float ball_spiking_speed = 600.0;
+constexpr float ball_spiking_speed = 500.0;
+constexpr float ball_blocked_speed = 400.0;
 constexpr float ball_up_speed = 20.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
@@ -32,6 +33,9 @@ constexpr float passing_min_dist = -100.0;
 constexpr float hitting_max_z_dist = 6.0;
 constexpr float spiking_min_player_z = 6.0;
 constexpr float bumping_xy_penalty = 70.0;
+constexpr float blocking_max_dist_from_center =
+    paddle_width + center_line_width + 5.0;
+constexpr float blocking_min_height = jump_height - 5.0;
 
 // all in seconds
 constexpr float service_hittable_time = 0.5;

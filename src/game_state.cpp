@@ -452,6 +452,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball_owner = -player; // negative values denote prev owner
         state.can_owner_move = true;
         state.landing_zone.pos = state.target.pos;
+        state.ball.pos.z = paddle->pos.z;
         sendBallDownToTarget(state, state.target.pos, ball_serving_speed);
         paddle->vel.z = -2 * ball_up_speed;
       }
@@ -499,15 +500,27 @@ void updatePlayerState(GameState &state, const InputMessage &input,
   } // END ball owner logic
   else {
     if (state.ball_state == BALL_STATE_TRAVELLING) {
-      // let the player pass the ball to their team-mate
-      // TODO: mechanism for blocking
       if (state.ball.vel.z > 0 && state.ball.pos.z >= ball_max_passing_height) {
         state.ball.vel.z *= -1;
       }
-
-      if (playerBallInCollision(state.ball.pos, paddle->pos) && input.hit &&
-          state.ball_owner != -player &&
-          state.ball_owner != -getTeammateIdx(player)) {
+      // mechanism for blocking
+      if (playerBallInCollision(state.ball.pos, paddle->pos) &&
+          std::abs(paddle->pos.x - (arena_width / 2.0f)) <
+              blocking_max_dist_from_center &&
+          paddle->pos.z >= blocking_min_height) {
+        state.target.pos = centerOfOpposingCourt(player);
+        Vec3 down_target = movePositionRandomly(
+            state.target.pos, passing_min_dist, passing_max_dist, state.tick,
+            -state.ball_owner);
+        sendBallDownToTarget(state, down_target, ball_blocked_speed);
+        state.target.pos = down_target;
+        state.landing_zone.pos = down_target;
+        state.ball_owner = -player;
+      } else if (playerBallInCollision(state.ball.pos, paddle->pos) &&
+                 input.hit &&
+                 // let the player pass the ball to their team-mate
+                 state.ball_owner != -player &&
+                 state.ball_owner != -getTeammateIdx(player)) {
         uint32_t teammate_idx = getTeammateIdx(player);
         state.ball_state = BALL_STATE_FIRST_PASS;
         state.ball_owner = teammate_idx + 1; // ball_owner is 1 indexed...
