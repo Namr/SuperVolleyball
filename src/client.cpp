@@ -304,15 +304,15 @@ void DrawTextCentered(const std::string &text, int x, int y, int font_size,
 InputMessage getInput(uint32_t tick) {
   InputMessage i;
   i.tick = tick;
-  i.up = IsKeyDown(KEY_UP);
-  i.down = IsKeyDown(KEY_DOWN);
-  i.left = IsKeyDown(KEY_LEFT);
-  i.right = IsKeyDown(KEY_RIGHT);
+  i.up = IsKeyDown(KEY_W);
+  i.down = IsKeyDown(KEY_S);
+  i.left = IsKeyDown(KEY_A);
+  i.right = IsKeyDown(KEY_D);
 
-  i.target_up = IsKeyDown(KEY_W);
-  i.target_down = IsKeyDown(KEY_S);
-  i.target_left = IsKeyDown(KEY_A);
-  i.target_right = IsKeyDown(KEY_D);
+  i.target_up = IsKeyDown(KEY_UP);
+  i.target_down = IsKeyDown(KEY_DOWN);
+  i.target_left = IsKeyDown(KEY_LEFT);
+  i.target_right = IsKeyDown(KEY_RIGHT);
 
   i.jump = IsKeyDown(KEY_SPACE);
   i.hit = IsKeyDown(KEY_E);
