@@ -3,7 +3,6 @@ make -j20
 
 ssh root@64.23.207.248 'tmux kill-server'
 rsync svb_server root@64.23.207.248:~/svb
-ssh root@64.23.207.248 'patchelf --replace-needed libGameNetworkingSockets.so /root/svb/libGameNetworkingSockets.so ~/svb/svb_server'
 ssh root@64.23.207.248 'tmux new-session -d "/root/svb/svb_server"'
 
 

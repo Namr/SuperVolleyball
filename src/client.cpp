@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <queue>
@@ -41,11 +42,17 @@ public:
           << error_msg << std::endl;
     }
     network_interface_ = SteamNetworkingSockets();
-
-    // connect to server
-    // TODO set server address from raylib input
     SteamNetworkingIPAddr server_address;
-    server_address.ParseString("64.23.207.248:25565");
+    std::ifstream server_config_file("server_config.txt");
+
+    if (server_config_file.good()) {
+      std::stringstream buffer;
+      buffer << server_config_file.rdbuf();
+      server_address.ParseString(buffer.str().c_str());
+    } else {
+      server_address.ParseString("64.23.207.248:25565");
+    }
+    // connect to server
     SteamNetworkingConfigValue_t opt;
     opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
                (void *)connectionStatusCallback);
@@ -339,28 +346,27 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   DrawRectangle(
       (int)state.p1.pos.x * w_ratio, (int)state.p1.pos.y * h_ratio,
       (int)(paddle_width + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
-      (int)(paddle_height + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
-      WHITE);
+      (int)(paddle_height + (state.p1.pos.z * Z_TO_SIZE_RATIO)) * h_ratio, RED);
   DrawRectangle(
       (int)state.p2.pos.x * w_ratio, (int)state.p2.pos.y * h_ratio,
       (int)(paddle_width + (state.p2.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
       (int)(paddle_height + (state.p2.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
-      WHITE);
+      DARKBLUE);
   DrawRectangle(
       (int)state.p3.pos.x * w_ratio, (int)state.p3.pos.y * h_ratio,
       (int)(paddle_width + (state.p3.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
       (int)(paddle_height + (state.p3.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
-      WHITE);
+      DARKPURPLE);
   DrawRectangle(
       (int)state.p4.pos.x * w_ratio, (int)state.p4.pos.y * h_ratio,
       (int)(paddle_width + (state.p4.pos.z * Z_TO_SIZE_RATIO)) * w_ratio,
       (int)(paddle_height + (state.p4.pos.z * Z_TO_SIZE_RATIO)) * h_ratio,
-      WHITE);
+      DARKGREEN);
 
   int adjusted_ball_radius =
       (int)(ball_radius + (state.ball.pos.z * Z_TO_SIZE_RATIO)) * w_ratio;
   DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
-             adjusted_ball_radius, GREEN);
+             adjusted_ball_radius, WHITE);
 
   // only if a player can target, display target
   if (state.ball_state == BALL_STATE_IN_SERVICE ||
@@ -461,10 +467,10 @@ public:
       BeginDrawing();
       client_.runCallbacks();
       client_.processIncomingMessages();
-      ClearBackground(BLACK);
 
       // menu system
       if (!client_.connected || scene_ != SCENE_ROOM_SELECT) {
+        ClearBackground(BLACK);
         switch (scene_) {
         default:
         case SCENE_MAIN_MENU:
@@ -483,14 +489,17 @@ public:
         // anymore
         if (client_.room_state == std::nullopt ||
             client_.room_state->current_room == -1) {
+          ClearBackground(BLACK);
           room_selection();
         } else {
           if (client_.room_state->state == RS_WAITING) {
+            ClearBackground(BLACK);
             // reset any possible left over state
             tick_ = 0;
             time_accumulator_ = 0;
             wait_for_match_start();
           } else {
+            ClearBackground(BEIGE);
             play_game();
           }
         }
