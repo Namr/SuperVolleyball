@@ -35,7 +35,7 @@ constexpr float spiking_min_player_z = 6.0;
 constexpr float bumping_xy_penalty = 70.0;
 constexpr float blocking_max_dist_from_center =
     paddle_width + center_line_width + 5.0;
-constexpr float blocking_min_height = jump_height - 5.0;
+constexpr float blocking_min_height = jump_height - 2.0;
 
 // all in seconds
 constexpr float service_hittable_time = 0.5;

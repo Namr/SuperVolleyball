@@ -369,6 +369,37 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
   DrawCircle(state.ball.pos.x * w_ratio, state.ball.pos.y * h_ratio,
              adjusted_ball_radius, WHITE);
 
+  Color owner_color;
+  switch (state.ball_owner) {
+  case 1:
+    owner_color = RED;
+    break;
+  case 2:
+    owner_color = DARKBLUE;
+    break;
+  case 3:
+    owner_color = DARKPURPLE;
+    break;
+  case 4:
+    owner_color = DARKGREEN;
+    break;
+  case 0:
+    owner_color = RED;
+    break;
+  case -1:
+    owner_color = DARKBLUE;
+    break;
+  case -2:
+    owner_color = DARKPURPLE;
+    break;
+  case -3:
+    owner_color = DARKGREEN;
+    break;
+  default:
+    owner_color = YELLOW;
+    break;
+  }
+
   // only if a player can target, display target
   if (state.ball_state == BALL_STATE_IN_SERVICE ||
       state.ball_state == BALL_STATE_SECOND_PASS) {
@@ -383,7 +414,7 @@ void drawGameState(const GameState &state, double w_ratio, double h_ratio) {
       state.ball_state == BALL_STATE_TRAVELLING) {
     DrawCircleLines((int)state.landing_zone.pos.x * w_ratio,
                     (int)state.landing_zone.pos.y * h_ratio,
-                    (int)target_radius * 2 * h_ratio, YELLOW);
+                    (int)target_radius * 2 * h_ratio, owner_color);
   }
 
   // divider lines

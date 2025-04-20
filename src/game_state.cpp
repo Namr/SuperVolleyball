@@ -303,7 +303,7 @@ void resetRound(GameState &state) {
   state.ball_state = BALL_STATE_READY_TO_SERVE;
   // FIXME: correct service rotation rules
   state.last_server += 1;
-  if (state.last_server > 3) {
+  if (state.last_server > 4) {
     state.last_server = 1;
   }
   state.ball_owner = state.last_server;
@@ -504,10 +504,12 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball.vel.z *= -1;
       }
       // mechanism for blocking
-      if (playerBallInCollision(state.ball.pos, paddle->pos) &&
+      if ((state.ball.pos - paddle->pos).magnitude2D() <
+              ball_radius + paddle_width &&
           std::abs(paddle->pos.x - (arena_width / 2.0f)) <
               blocking_max_dist_from_center &&
-          paddle->pos.z >= blocking_min_height) {
+          paddle->pos.z >= blocking_min_height && state.ball_owner != -player &&
+          state.ball_owner != -getTeammateIdx(player)) {
         state.target.pos = centerOfOpposingCourt(player);
         Vec3 down_target = movePositionRandomly(
             state.target.pos, passing_min_dist, passing_max_dist, state.tick,
