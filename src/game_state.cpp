@@ -41,6 +41,7 @@ GameState interpolate(GameState &previous, GameState &next, double a) {
   ret.last_server = previous.last_server;
   ret.ball_owner = previous.ball_owner;
   ret.can_owner_move = previous.can_owner_move;
+  ret.is_blocking_allowed = previous.is_blocking_allowed;
   return ret;
 }
 
@@ -200,6 +201,7 @@ void resetGameState(GameState &state) {
   state.p1.pos.x = starting_dist_from_screen;
   state.p1.pos.y = arena_height / 4.0;
   state.p1.pos.z = 0;
+  state.p1.jump_cooldown = 0.0f;
 
   state.p2.vel.x = 0;
   state.p2.vel.y = 0;
@@ -207,6 +209,7 @@ void resetGameState(GameState &state) {
   state.p2.pos.x = starting_dist_from_screen;
   state.p2.pos.y = 3.0f * (arena_height / 4.0);
   state.p2.pos.z = 0;
+  state.p2.jump_cooldown = 0.0f;
 
   state.p3.vel.x = 0;
   state.p3.vel.y = 0;
@@ -214,6 +217,7 @@ void resetGameState(GameState &state) {
   state.p3.pos.x = arena_width - paddle_width - starting_dist_from_screen;
   state.p3.pos.y = arena_height / 4.0;
   state.p3.pos.z = 0;
+  state.p3.jump_cooldown = 0.0f;
 
   state.p4.vel.x = 0;
   state.p4.vel.y = 0;
@@ -221,6 +225,7 @@ void resetGameState(GameState &state) {
   state.p4.pos.x = arena_width - paddle_width - starting_dist_from_screen;
   state.p4.pos.y = 3.0f * (arena_height / 4.0);
   state.p4.pos.z = 0;
+  state.p4.jump_cooldown = 0.0f;
 
   state.target.vel.x = 0;
   state.target.vel.y = 0;
@@ -240,6 +245,7 @@ void resetGameState(GameState &state) {
   state.last_server = 1;
   state.ball_owner = 1;
   state.can_owner_move = false;
+  state.is_blocking_allowed = false;
 
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
   state.ball.vel.x = 0;
@@ -264,6 +270,7 @@ void resetRound(GameState &state) {
   state.p1.pos.x = starting_dist_from_screen;
   state.p1.pos.y = arena_height / 4.0;
   state.p1.pos.z = 0;
+  state.p1.jump_cooldown = 0.0f;
 
   state.p2.vel.x = 0;
   state.p2.vel.y = 0;
@@ -271,6 +278,7 @@ void resetRound(GameState &state) {
   state.p2.pos.x = starting_dist_from_screen;
   state.p2.pos.y = 3.0f * (arena_height / 4.0);
   state.p2.pos.z = 0;
+  state.p2.jump_cooldown = 0.0f;
 
   state.p3.vel.x = 0;
   state.p3.vel.y = 0;
@@ -278,6 +286,7 @@ void resetRound(GameState &state) {
   state.p3.pos.x = arena_width - paddle_width - starting_dist_from_screen;
   state.p3.pos.y = arena_height / 4.0;
   state.p3.pos.z = 0;
+  state.p3.jump_cooldown = 0.0f;
 
   state.p4.vel.x = 0;
   state.p4.vel.y = 0;
@@ -285,6 +294,7 @@ void resetRound(GameState &state) {
   state.p4.pos.x = arena_width - paddle_width - starting_dist_from_screen;
   state.p4.pos.y = 3.0f * (arena_height / 4.0);
   state.p4.pos.z = 0;
+  state.p4.jump_cooldown = 0.0f;
 
   state.target.vel.x = 0;
   state.target.vel.y = 0;
@@ -308,6 +318,7 @@ void resetRound(GameState &state) {
   }
   state.ball_owner = state.last_server;
   state.can_owner_move = false;
+  state.is_blocking_allowed = false;
 
   PhysicsState *owning_player = playerFromIndex(state, state.ball_owner - 1);
   state.ball.vel.x = 0;
@@ -354,11 +365,15 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       paddle->vel.x = 0.0;
     }
 
+    paddle->jump_cooldown -= delta_time;
+    paddle->jump_cooldown = std::max(paddle->jump_cooldown, 0.0f);
+
     if (paddle->pos.z >= jump_height) {
       paddle->vel.z = -jump_speed / 1.5;
     }
 
-    if (input.jump && paddle->pos.z == 0.0) {
+    if (input.jump && paddle->pos.z == 0.0 && paddle->jump_cooldown == 0.0) {
+      paddle->jump_cooldown = jump_cooldown;
       paddle->vel.z = jump_speed;
     }
 
@@ -369,8 +384,10 @@ void updatePlayerState(GameState &state, const InputMessage &input,
       paddle->vel.y = (paddle->vel.y / magnitude) * paddle_speed;
     }
 
-    paddle->pos.x += paddle->vel.x * delta_time;
-    paddle->pos.y += paddle->vel.y * delta_time;
+    if (paddle->pos.z == 0.0) {
+      paddle->pos.x += paddle->vel.x * delta_time;
+      paddle->pos.y += paddle->vel.y * delta_time;
+    }
 
     paddle->pos.y =
         std::clamp(paddle->pos.y, 0.0f, arena_height - paddle_height);
@@ -453,6 +470,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.can_owner_move = true;
         state.landing_zone.pos = state.target.pos;
         state.ball.pos.z = paddle->pos.z;
+        state.is_blocking_allowed = false;
         sendBallDownToTarget(state, state.target.pos, ball_serving_speed);
         paddle->vel.z = -2 * ball_up_speed;
       }
@@ -480,10 +498,12 @@ void updatePlayerState(GameState &state, const InputMessage &input,
           state.ball_state = BALL_STATE_TRAVELLING;
           state.ball_owner = -player; // negative values denote prev owner
           state.landing_zone.pos = state.target.pos;
+          state.is_blocking_allowed = true;
           sendBallDownToTarget(state, state.target.pos, ball_spiking_speed);
         } else if (playerCanReachUpToBall(state.ball.pos, paddle->pos)) {
           // if you just bump the ball instead of spiking it,
           // we incur a random aim penalty
+          // but you can't block the shot
 
           // garbage hack to allow movePositionRandomly to bounds check properly
           int tmp_player = player == 0 ? -1 : -player;
@@ -493,6 +513,7 @@ void updatePlayerState(GameState &state, const InputMessage &input,
           state.ball_state = BALL_STATE_TRAVELLING;
           state.ball_owner = -player; // negative values denote prev owner
           state.landing_zone.pos = state.target.pos;
+          state.is_blocking_allowed = false;
           sendBallUpToTarget(state, state.target.pos, ball_shooting_speed);
         }
       }
@@ -504,7 +525,11 @@ void updatePlayerState(GameState &state, const InputMessage &input,
         state.ball.vel.z *= -1;
       }
       // mechanism for blocking
-      if ((state.ball.pos - paddle->pos).magnitude2D() <
+      // criteria: blocking is enabled, ball and player are overlapping in 2D,
+      // you are at a certain height, and you are not on the team of the
+      // previous ball owner
+      if (state.is_blocking_allowed &&
+          (state.ball.pos - paddle->pos).magnitude2D() <
               ball_radius + paddle_width &&
           std::abs(paddle->pos.x - (arena_width / 2.0f)) <
               blocking_max_dist_from_center &&

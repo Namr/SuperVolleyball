@@ -22,7 +22,7 @@ constexpr int SCENE_MAIN_MENU = 0;
 constexpr int SCENE_ROOM_SELECT = 1;
 constexpr int SCENE_SETTINGS = 2;
 constexpr int SCENE_SET_NAME = 3;
-constexpr uint16_t NICKNAME_MAX_LENGTH = 6;
+constexpr uint16_t NICKNAME_MAX_LENGTH = 13;
 
 constexpr std::array<std::pair<int, int>, 4> AVAILABLE_RESOLUTIONS = {
     std::make_pair(800, 450), std::make_pair(1280, 820),
@@ -324,10 +324,12 @@ void drawDebugOverlay(const GameState &state, double w_ratio, double h_ratio) {
   char ball_state[20];
   char ball_owner[20];
   char timer[20];
+  char can_block[20];
   char ball_physics[100];
   snprintf(ball_state, 20, "ball_state: %d", state.ball_state);
   snprintf(ball_owner, 20, "ball_owner: %d", state.ball_owner);
   snprintf(timer, 20, "timer: %f", state.timer);
+  snprintf(can_block, 20, "can_block: %d", state.is_blocking_allowed);
   snprintf(ball_physics, 100, "ball z: %f, vx: %f, vy:%f, vz: %f",
            state.ball.pos.z, state.ball.vel.x, state.ball.vel.y,
            state.ball.vel.z);
@@ -337,6 +339,8 @@ void drawDebugOverlay(const GameState &state, double w_ratio, double h_ratio) {
   DrawText(ball_owner, (arena_width / 25) * w_ratio, 40 * h_ratio, 10 * h_ratio,
            YELLOW);
   DrawText(timer, (arena_width / 25) * w_ratio, 50 * h_ratio, 10 * h_ratio,
+           YELLOW);
+  DrawText(can_block, (arena_width / 25) * w_ratio, 60 * h_ratio, 10 * h_ratio,
            YELLOW);
   DrawText(ball_physics, 12 * (arena_width / 25) * w_ratio, 20 * h_ratio,
            10 * h_ratio, YELLOW);

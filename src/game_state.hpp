@@ -21,7 +21,7 @@ constexpr float hit_leeway = -0.1;
 constexpr float ball_serving_speed = 400.0;
 constexpr float ball_shooting_speed = 250.0;
 constexpr float ball_spiking_speed = 500.0;
-constexpr float ball_blocked_speed = 400.0;
+constexpr float ball_blocked_speed = 300.0;
 constexpr float ball_up_speed = 20.0;
 constexpr float max_bounce_angle = 35.0;
 constexpr float center_line_width = 10.0;
@@ -42,6 +42,7 @@ constexpr float service_hittable_time = 0.5;
 constexpr float service_max_time = 2.5;
 constexpr float ball_passing_time = 2.5;
 constexpr float game_over_grace_period = 0.5;
+constexpr float jump_cooldown = 1.5;
 
 constexpr double EPSILON = 0.8;
 
@@ -98,13 +99,14 @@ struct Vec3 {
 struct PhysicsState {
   Vec3 pos;
   Vec3 vel;
+  float jump_cooldown;
 
   template <class Archive> void serialize(Archive &archive) {
-    archive(pos, vel);
+    archive(pos, vel, jump_cooldown);
   }
 
   bool operator==(const PhysicsState &c) {
-    return pos == c.pos && vel == c.vel;
+    return pos == c.pos && vel == c.vel && fcmp(jump_cooldown, c.jump_cooldown);
   }
 };
 
@@ -134,12 +136,14 @@ struct GameState {
   uint8_t last_server = 1;
   int16_t ball_owner = 1; // who is serving the ball right now 1-4; 0 -> no-one
   bool can_owner_move = false;
+  bool is_blocking_allowed = false;
   float timer = 0.0;
 
   template <class Archive> void serialize(Archive &archive) {
     archive(p1, p2, p3, p4, ball, target, landing_zone, team1_score,
             team2_score, team1_points_to_give, team2_points_to_give, tick,
-            ball_state, last_server, ball_owner, can_owner_move, timer);
+            ball_state, last_server, ball_owner, can_owner_move,
+            is_blocking_allowed, timer);
   }
 
   bool operator==(const GameState &c) {
@@ -151,7 +155,7 @@ struct GameState {
            team2_points_to_give == c.team2_points_to_give && tick == c.tick &&
            ball_state == c.ball_state && last_server == c.last_server &&
            ball_owner == c.ball_owner && can_owner_move == c.can_owner_move &&
-           fcmp(timer, c.timer);
+           is_blocking_allowed == c.is_blocking_allowed && fcmp(timer, c.timer);
   }
 
   bool operator!=(const GameState &c) { return !(*this == c); }
